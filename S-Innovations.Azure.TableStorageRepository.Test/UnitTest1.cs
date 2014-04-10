@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.WindowsAzure.Storage;
 using System.Linq;
+using Microsoft.WindowsAzure.Storage.Auth;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -19,7 +20,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
     public class MyTableStorageContext : TableStorageContext
     {   
-        public MyTableStorageContext() : base(new CloudStorageAccount(new Microsoft.WindowsAzure.Storage.Auth.StorageCredentials("c1azuretests","GB2JACAMd2Y7Hw1KCGgw+pwzLmvaR2YRY5nlcdQb9AkjmhQKCeYlkOGvZoGAWoA4zjvZhEnRJgDqJuboy/ZU4A=="),true))
+        public MyTableStorageContext() : base(new CloudStorageAccount(new StorageCredentials("c1azuretests","GB2JACAMd2Y7Hw1KCGgw+pwzLmvaR2YRY5nlcdQb9AkjmhQKCeYlkOGvZoGAWoA4zjvZhEnRJgDqJuboy/ZU4A=="),true))
         {
 
         }
