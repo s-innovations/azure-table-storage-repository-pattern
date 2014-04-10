@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -144,9 +145,8 @@ namespace SInnovations.Azure.TableStorageRepository
                 return;
             await _table.CreateIfNotExistsAsync();
 
-            var batches = _cache.GroupBy(b => SetKeys(b.Entity).PartitionKey).ToArray();
-            _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
-            foreach (var batch in batches)
+
+            var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
             {
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
@@ -168,7 +168,23 @@ namespace SInnovations.Azure.TableStorageRepository
 
                 }
                 await _table.ExecuteBatchAsync(batchOpr);
+
+            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = ExecutionDataflowBlockOptions.Unbounded });
+
+
+            var batches = _cache.GroupBy(b => SetKeys(b.Entity).PartitionKey);
+            foreach(var group in batches)
+            foreach (var batch in group
+                  .Select((x, i) => new { Group = x, Index = i })
+                  .GroupBy(x => x.Index / 100)
+                  .Select(x=>x.Select(v=>v.Group).ToArray())
+                  .Select(t=>t.ToArray()))                  
+            {
+                actionblock.Post(batch);
             }
+            actionblock.Complete();
+            await actionblock.Completion;
+            _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
         }
     }
