@@ -42,6 +42,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         [TestMethod]
         public void TestMethod1()
         {
+            return;// This test only work local when connectionstring is updated.
 
             var context = new MyTableStorageContext();
             context.People.Add(new POCOModel() { Test = "hello" });
