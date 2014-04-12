@@ -76,7 +76,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
             modelbuilder.Entity<Family>()
                 .HasKeys(f => f.FamilyName, f => "")
-                .WithCollectionOf<Person>(f => f.People, (source, family) => (from ent in source where ent.FamilyName == family.FamilyName select ent))
+                .WithCollectionOf<Person>(f => f.People, (source, family) => (from ent in source where ent.PartitionKey == family.FamilyName select ent))
                 .ToTable("AspNetFamility");
         }
 

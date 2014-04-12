@@ -46,10 +46,14 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private readonly CloudTableClient _client;
         private List<ITableRepository> repositories = new List<ITableRepository>();
+
+
+        public bool AutoSaveOnDispose { get; set; }
         public TableStorageContext(CloudStorageAccount storage)
         {
 
             _client = storage.CreateCloudTableClient();
+            
             modelbuilder = new TableStorageModelBuilder();
             OnModelCreating(modelbuilder);
             BuildModel(modelbuilder);
@@ -57,6 +61,20 @@ namespace SInnovations.Azure.TableStorageRepository
 
             InsertionMode = InsertionMode.Add;
         }
+
+        public void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected virtual void Dispose(bool disposing)
+        {
+          
+        }
+
+
+
+
         public TableEntityRepository<TEntity> TableEntityRepository<TEntity>() where TEntity : ITableEntity,new()
         {
             throw new NotImplementedException();
@@ -114,5 +132,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             return _client.GetTableReference(modelbuilder._configurations[typeof(T1)].TableName);
         }
+
+
     }
 }

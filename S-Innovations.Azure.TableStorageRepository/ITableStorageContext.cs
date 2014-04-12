@@ -10,9 +10,8 @@ using System.Threading.Tasks.Dataflow;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
-    public interface ITableStorageContext
+    public interface ITableStorageContext: IDisposable
     {
-
         InsertionMode InsertionMode { get; set; }
         CloudTable GetTable(string name);
     }
@@ -51,6 +50,7 @@ namespace SInnovations.Azure.TableStorageRepository
         void Delete(TEntity entity);
         void Update(TEntity entity);
 
+        
         TableQuery<TEntity> Source { get; }
         IEnumerable<TEntity> FluentQuery(string filter);
 
@@ -279,6 +279,9 @@ namespace SInnovations.Azure.TableStorageRepository
 
                             foreach (var index in configuration.Indexes.Values)
                             {
+                                var indexkey = index.GetIndexKey(item.Entity);
+                                if(indexkey==null)
+                                    continue;
                                 indexes.Add(new EntityStateWrapper<IndexEntity>
                                 {
                                     State = EntityState.Added,
@@ -286,8 +289,7 @@ namespace SInnovations.Azure.TableStorageRepository
                                         new IndexEntity
                                         {
                                             Config = index,
-                                            PartitionKey =
-                                            index.GetIndexKey(item.Entity),
+                                            PartitionKey =indexkey,
                                             RowKey = "",
                                             RefRowKey = item.Entity.RowKey,
                                             RefPartitionKey = item.Entity.PartitionKey,
@@ -297,6 +299,13 @@ namespace SInnovations.Azure.TableStorageRepository
                             batchOpr.Add(GetInsertionOperation(item.Entity));
                             break;
                         case EntityState.Updated:
+                            foreach (var collection in configuration.Collections)
+                            {
+                               var rep= collection.PropertyInfo.GetValue(item.Entity) as ITableRepository;
+                               await rep.SaveChangesAsync();
+                            }
+
+
                             batchOpr.Add(TableOperation.Merge(item.Entity));
                             break;
                         case EntityState.Deleted:

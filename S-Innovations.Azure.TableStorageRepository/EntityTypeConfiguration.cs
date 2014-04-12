@@ -144,18 +144,26 @@ namespace SInnovations.Azure.TableStorageRepository
        
             var oType = typeof(T);
             if (IsStringConvertable(oType))
-                return (o) => func(o).ToString();
+                return (o) => ConvertToString(func(o));
             else
             {
                 var properties = oType.GetProperties().Where(p=> IsStringConvertable(p.PropertyType)).ToArray();
                 return (o) => {
                     var obj = func(o);
-                    return string.Join("__", properties.Select(p => p.GetValue(obj).ToString()));
+                    var objs = properties.Select(p => p.GetValue(obj));
+                    if(objs.Any(p=>p==null))
+                        return null;
+                    return string.Join("__", objs);
                 
                 };
             }
         }
-
+        private static string ConvertToString(object obj)
+        {
+            if(obj==null)
+                return null;
+            return obj.ToString();
+        }
         public static bool IsStringConvertable(Type type)
         {
             return type.IsPrimitive || type == typeof(string) || type == typeof(Guid);
