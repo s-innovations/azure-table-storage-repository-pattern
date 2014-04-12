@@ -8,12 +8,18 @@ namespace SInnovations.Azure.TableStorageRepository
 {
     public class TableStorageModelBuilder
     {
+       
+        public TableStorageModelBuilder()
+        {
+
+        }
         internal ConcurrentDictionary<Type, EntityTypeConfiguration> _configurations = new ConcurrentDictionary<Type, EntityTypeConfiguration>();
         public EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
         {
-            var config = new EntityTypeConfiguration<TEntityType>();
-            _configurations.AddOrUpdate(typeof(TEntityType), (type) => config, (type, old) => config);
-            return config;
+
+            if (!_configurations.ContainsKey(typeof(TEntityType)))
+                _configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>(this));
+            return (EntityTypeConfiguration<TEntityType>)_configurations[typeof(TEntityType)];
         }
     }
 }

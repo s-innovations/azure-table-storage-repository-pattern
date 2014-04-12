@@ -7,6 +7,18 @@ using System.Text;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
+    public class IndexEntity : TableEntity
+    {
+        public string RefRowKey { get; set; }
+        public string RefPartitionKey { get; set; }
+
+        [IgnoreProperty]
+        public IndexConfiguration Config { get; set; }
+    }
+    public interface EntityAdapter
+    {
+        object GetInnerObject();
+    }
     public class EntityAdapter<T> : ITableEntity where T : new()
     {
 
@@ -20,7 +32,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             this.InnerObject = innerObject;
         }
-
+        public object GetInnerObject() { return InnerObject; }
         public T InnerObject { get; set; }
 
         public EntityState State { get; set; }
