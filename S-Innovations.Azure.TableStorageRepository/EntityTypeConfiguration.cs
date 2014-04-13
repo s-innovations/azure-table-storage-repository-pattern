@@ -43,7 +43,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public void GetFilterQuery<TEntity, TChild>(ITableRepository<TChild> source, TEntity entity) 
         {
             var filterFunc = (Func<ITableRepository<TChild>, TEntity, IQueryable<TChild>>)Filter;
-            source.parentQuery= filterFunc(source, entity);
+            source.BaseQuery= filterFunc(source, entity);
 
         }
          

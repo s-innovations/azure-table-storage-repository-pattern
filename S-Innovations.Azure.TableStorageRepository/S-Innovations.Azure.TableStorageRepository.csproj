@@ -105,6 +105,7 @@
     <Compile Include="Queryable\Wrappers\ITableQuery.cs" />
     <Compile Include="Queryable\Wrappers\TableQueryWrapper.cs" />
     <Compile Include="TableRepositories\ITableRepository.cs" />
+    <Compile Include="TableRepositories\TableEntityRepository.cs" />
     <Compile Include="TableRepositories\TablePocoRepository.cs" />
     <Compile Include="TableRepositories\TableRepository.cs" />
     <Compile Include="TableStorageContext.cs" />

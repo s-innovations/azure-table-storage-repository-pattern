@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -44,6 +45,58 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Updated, Entity = entity });
 
         }
+
+
+        public virtual async Task<TEntity> FindByKeysAsync(string partitionkey, string rowkey)
+        {
+            var result = await table.ExecuteAsync(TableOperation.Retrieve<TEntity>(partitionkey, rowkey));
+            return SetCollections((TEntity)result.Result);
+        }
+
+        public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
+        {
+
+
+            foreach (var index in configuration.Indexes.Values)
+            {
+                var table = context.GetTable(index.TableName ?? configuration.TableName + "Index");
+
+                var opr = TableOperation.Retrieve<IndexEntity>(string.Join("__", keys.Select(k => k.ToString())), "");
+                var result = await table.ExecuteAsync(opr);
+                if (result.Result != null)
+                {
+                    var idxEntity = result.Result as IndexEntity;
+                    var entity = await this.table.ExecuteAsync(TableOperation.Retrieve<TEntity>(idxEntity.RefPartitionKey, idxEntity.RefRowKey));
+                    return SetCollections((TEntity)entity.Result);
+                }
+
+            }
+            return default(TEntity);
+        }
+
+        private static MethodInfo QueryFilterMethod = typeof(CollectionConfiguration).GetMethod("GetFilterQuery");
+        protected T SetCollections<T>(T entity)
+        {
+            if (typeof(T) != typeof(TEntity))
+                return entity;
+
+            if (entity == null)
+                return entity;
+
+            foreach (var collectionInfo in configuration.Collections)
+            {
+
+
+                var repository = collectionInfo.Activator(context);
+
+                QueryFilterMethod.MakeGenericMethod(collectionInfo.ParentEntityType, collectionInfo.EntityType)
+                    .Invoke(collectionInfo, new object[] { repository, entity });
+
+                collectionInfo.PropertyInfo.SetValue(entity, repository);
+            }
+            return entity;
+        }
+
         public async Task SaveChangesAsync()
         {
             if (!_cache.Any())

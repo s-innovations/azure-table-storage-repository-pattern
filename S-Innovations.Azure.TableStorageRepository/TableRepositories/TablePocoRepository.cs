@@ -178,12 +178,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public  async Task<TEntity> FindByIndexAsync(params Object[] keys)
         {
-            throw new NotImplementedException();
-
-            //var result =  (await base.FindByIndexAsync(keys));
-            //if(result==null)
-            //    return default(TEntity);
-            //return result.InnerObject;
+            var result =  (await base.FindByIndexAsync(keys));
+            if(result==null)
+                return default(TEntity);
+            return result.InnerObject;
         }
 
 
@@ -193,12 +191,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
         {
-            throw new NotImplementedException();
-
-            //var result = (await base.FindByKeysAsync(partitionKey, rowKey));
-            //if (result == null)
-            //    return default(TEntity);
-            //return SetCollections<TEntity>(result.InnerObject);
+            var result = (await base.FindByKeysAsync(partitionKey, rowKey));
+            if (result == null)
+                return default(TEntity);
+            return SetCollections<TEntity>(result.InnerObject);
         }
 
 
@@ -237,8 +233,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             get
             {
-                if (parentQuery != null)
-                    return parentQuery.Expression;
+                if (BaseQuery != null)
+                    return BaseQuery.Expression;
                 return _expression;
             }
         }
@@ -252,8 +248,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         public IQueryProvider Provider {
             get
             {
-                if (parentQuery != null)
-                    return parentQuery.Provider;
+                if (BaseQuery != null)
+                    return BaseQuery.Provider;
                 return _provider;
             }
         }
@@ -268,7 +264,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return ((IEnumerable)Provider.Execute(Expression)).GetEnumerator();
         }
 
-        public IQueryable<TEntity> parentQuery { get; set; }
+        public IQueryable<TEntity> BaseQuery { get; set; }
      
     }
 }

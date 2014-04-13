@@ -20,10 +20,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         void Delete(TEntity entity);
         void Update(TEntity entity);
 
-        IQueryable<TEntity> parentQuery { get; set; }
+        IQueryable<TEntity> BaseQuery { get; set; }
 
         IEnumerable<TEntity> FluentQuery(string filter);
-
         Task<TEntity> FindByIndexAsync(params object[] keys);
         Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey);
     }

@@ -142,7 +142,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             var adsad1 = await context.People1.FindByKeysAsync("adsad1", "as");
             var subitems = (from ent in adsad1.Items
                            select ent).ToArray();
-            var tst = (from ent in ((ITableRepository<SubItem>)adsad1.Items).parentQuery
+            var tst = (from ent in ((ITableRepository<SubItem>)adsad1.Items).BaseQuery
                       select ent).ToArray();
 
             var allsubs = (from ent in context.SubItems select ent).ToArray();
