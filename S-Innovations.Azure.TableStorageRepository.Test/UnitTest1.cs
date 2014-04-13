@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Auth;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
+using SInnovations.Azure.TableStorageRepository.TableRepositories;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -194,7 +195,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             context.Pets.Add(new Pet { PetName = "HendeDenHvide", FamilyName = "Sorensen" });
             context.SaveChangesAsync().Wait();
 
-            var iqueryable_querys = from ent in context.Pets.Source
+            var iqueryable_querys = from ent in context.Pets
                                     where ent.PartitionKey == "Sorensen"
                                     select ent;
 

@@ -1,5 +1,7 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,6 +14,7 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         public Func<TEntity, String> PartitionKeyMapper { get; set; }
         public Func<TEntity, String> RowKeyMapper { get; set; }
+        public Action<TEntity,string,string> ReverseKeysMapper { get; set; }
     }
     public struct IndexConfiguration
     {
@@ -33,14 +36,14 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public object Filter { get; set; }
 
-        public Func<TableQuery<TChild>, TEntity, IQueryable<TChild>> GetFilter<TEntity, TChild>()
+        public Func<IQueryable<TChild>, TEntity, IQueryable<TChild>> GetFilter<TEntity, TChild>()
         {
-            return (Func<TableQuery<TChild>, TEntity, IQueryable<TChild>>)Filter;
+            return (Func<IQueryable<TChild>, TEntity, IQueryable<TChild>>)Filter;
         }
-        public void GetFilterQuery<TEntity, TChild>(TableRepository<TChild> source, TEntity entity)
+        public void GetFilterQuery<TEntity, TChild>(ITableRepository<TChild> source, TEntity entity) 
         {
-            var filterFunc = (Func<TableQuery<TChild>, TEntity, IQueryable<TChild>>)Filter;
-            source.parentQuery= filterFunc(source.Source, entity);
+            var filterFunc = (Func<ITableRepository<TChild>, TEntity, IQueryable<TChild>>)Filter;
+            source.parentQuery= filterFunc(source, entity);
 
         }
          
@@ -48,14 +51,20 @@ namespace SInnovations.Azure.TableStorageRepository
     public class EntityTypeConfiguration
     {
         protected readonly TableStorageModelBuilder builder;
+        public ConcurrentDictionary<long, Tuple<DateTimeOffset, string>> EntityStates { get; set; }
+
         public EntityTypeConfiguration(TableStorageModelBuilder builder)
         {
             this.builder = builder;
             Indexes = new Dictionary<string, IndexConfiguration>();
             Collections = new List<CollectionConfiguration>();
+            NamePairs = new Dictionary<string, string>();
+            EntityStates = new ConcurrentDictionary<long, Tuple<DateTimeOffset, string>>();
           
         }
         public object KeyMapper { get; set; }
+
+        public Dictionary<string, string> NamePairs { get; set; }
         public Dictionary<string, IndexConfiguration> Indexes { get; set; }
         public List<CollectionConfiguration> Collections { get; set; }
 
@@ -65,19 +74,96 @@ namespace SInnovations.Azure.TableStorageRepository
             return (KeysMapper<TEntity>)KeyMapper;
         }
 
+        public void ReverseKeyMapping<TEntity>(EntityAdapter<TEntity> entity) where TEntity : new()
+        {
+            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.PartitionKey, entity.RowKey);
+        }
+
     }
 
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
+
+       
+
         public EntityTypeConfiguration(TableStorageModelBuilder builder) :base(builder)
         {
     
         }
-        public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression, Expression<Func<TEntityType, TRowKey>> RowKeyExpression)
+        public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
+            Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression, 
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression)
         {
-            string v="";
-            KeyMapper = new KeysMapper<TEntityType> { PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out v), RowKeyMapper = ConvertToStringKey(RowKeyExpression, out v) };
+            string partitionKey="";
+            string rowKey = "";
+           
+            var keyMapper = new KeysMapper<TEntityType> { 
+                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey),
+                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey) };
+            this.NamePairs.Add(partitionKey, "PartitionKey");
+            this.NamePairs.Add(rowKey, "RowKey");
+
+            Action<TEntityType,string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
+            Action<TEntityType, string> rowAction = GetReverseActionFrom<TRowKey>(RowKeyExpression);
+
+            keyMapper.ReverseKeysMapper = (a, part, row) =>
+            {
+                partitionAction(a, part);
+                rowAction(a, row);
+            };
+
+            KeyMapper = keyMapper;
             return this;
+        }
+
+        private Action<TEntityType, string> GetReverseActionFrom<TPartitionKey>(Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression)
+        {
+            if (PartitionKeyExpression.Body is MemberExpression)
+            {
+                return GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression.Body as MemberExpression);
+            }
+            else if (PartitionKeyExpression.Body is NewExpression)
+            {
+                return GetReverseActionFrom(PartitionKeyExpression.Body as NewExpression);
+            }
+            throw new NotImplementedException("Expression not known");
+        }
+
+        private Action<TEntityType, string> GetReverseActionFrom<TPartitionKey>(MemberExpression memberEx)
+        {
+            var property = memberEx.Member as PropertyInfo;
+            return (a, partitionkey) => property.SetValue(a, StringTo(typeof(TPartitionKey), partitionkey));
+        }
+
+        private Action<TEntityType, string> GetReverseActionFrom(NewExpression newEx)
+        {
+            Action<TEntityType, string> partitionAction = (a, partitionkey) =>
+            {
+                var parts = partitionkey.Split(new[] { "__" }, StringSplitOptions.RemoveEmptyEntries);
+
+                for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
+                {
+                    var prop = newEx.Members[i] as PropertyInfo;
+                    prop.SetValue(a, StringTo(prop.PropertyType, partitionkey));
+                }
+
+            };
+            return partitionAction;
+        }
+
+        private object StringTo(Type type, string key)
+        {
+      
+            if (type == typeof(string))
+                return key;
+            else if (type == typeof(int))
+                return int.Parse(key);
+            else if (type == typeof(long))
+                return long.Parse(key);
+            else if (type == typeof(Guid))
+                return Guid.Parse(key);
+               
+            throw new Exception("not supported type");
         }
         public EntityTypeConfiguration<TEntityType> WithIndex<T>(Expression<Func<TEntityType,T>> index, string TableName = null )
         {
@@ -87,9 +173,12 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
+
+
+
         public EntityTypeConfiguration<TEntityType> WithCollectionOf<T>(
-            Expression<Func<TEntityType, ICollection<T>>> expression,
-            Func<TableQuery<T>,TEntityType,IQueryable<T>> filter )
+            Expression<Func<TEntityType, IEnumerable<T>>> expression,
+            Func<IQueryable<T>, TEntityType, IQueryable<T>> filter)
             where T : new()
         {
             if (expression.Body is MemberExpression)

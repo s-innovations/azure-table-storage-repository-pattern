@@ -28,9 +28,12 @@ namespace SInnovations.Azure.TableStorageRepository
             this.InnerObject = new T();
         }
 
-        public EntityAdapter(T innerObject)
+        public EntityAdapter(T innerObject,DateTimeOffset? timestamp=null, string Etag=null)
         {
             this.InnerObject = innerObject;
+            if (timestamp.HasValue)
+                this.Timestamp = timestamp.Value;
+            this.ETag = Etag;
         }
         public object GetInnerObject() { return InnerObject; }
         public T InnerObject { get; set; }

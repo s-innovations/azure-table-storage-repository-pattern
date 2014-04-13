@@ -1,5 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
