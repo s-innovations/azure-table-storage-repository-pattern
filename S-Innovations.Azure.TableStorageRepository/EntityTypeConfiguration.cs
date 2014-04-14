@@ -84,6 +84,7 @@ namespace SInnovations.Azure.TableStorageRepository
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
 
+        private static Action<TEntityType, string> EmptyReverseAction = (_, __) => { };
        
 
         public EntityTypeConfiguration(TableStorageModelBuilder builder) :base(builder)
@@ -126,7 +127,8 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 return GetReverseActionFrom(PartitionKeyExpression.Body as NewExpression);
             }
-            throw new NotImplementedException("Expression not known");
+            return EmptyReverseAction;
+           
         }
 
         private Action<TEntityType, string> GetReverseActionFrom<TPartitionKey>(MemberExpression memberEx)
