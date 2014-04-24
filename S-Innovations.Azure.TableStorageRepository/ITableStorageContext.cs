@@ -39,6 +39,7 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         public EntityState State { get; set; }
         public T Entity { get; set; }
+        public bool KeysLocked{get;set;}
     }
 
     

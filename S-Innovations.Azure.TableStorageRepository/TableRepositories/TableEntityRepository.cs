@@ -12,7 +12,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
     public class TableEntityRepository<TEntity> :
            TableRepository<TEntity>,
            ITableRepository<TEntity>
-           where TEntity : ITableEntity, new()
+           where TEntity : ITableEntity,new()
     {       
     
 
@@ -66,12 +66,16 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
         public IEnumerator<TEntity> GetEnumerator()
         {
-            return ((IEnumerable<TEntity>)Provider.Execute(Expression)).GetEnumerator();
+            if (BaseQuery != null)
+                return BaseQuery.GetEnumerator();
+            return table.CreateQuery<TEntity>().GetEnumerator(); 
+           // return ((IEnumerable<TEntity>)Provider.Execute(Expression)).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable)Provider.Execute(Expression)).GetEnumerator();
+            return GetEnumerator();
+        //    return ((IEnumerable)Provider.Execute(Expression)).GetEnumerator();
         }
 
         public Type ElementType

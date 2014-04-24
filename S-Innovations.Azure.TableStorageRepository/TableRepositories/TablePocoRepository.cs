@@ -18,25 +18,31 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
     public class TablePocoRepository<TEntity> :
            TableRepository<EntityAdapter<TEntity>>,
-           ITableRepository<TEntity> where TEntity : new()
+           ITableRepository<TEntity>
     {
         private readonly Expression _expression;
+        private new readonly EntityTypeConfiguration<TEntity> configuration;
        
         public TablePocoRepository(ITableStorageContext context, EntityTypeConfiguration<TEntity> configuration)
             : base(context, configuration)
         {
-            //     this.configuration = configuration;
+            this.configuration = configuration;
             _expression = Expression.Constant(this);
             //var t = new CloudTableWrapper(table);
             _provider = new TableQueryProvider<TEntity>(this, configuration);
         }
-        protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
+
+
+        //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
+        protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
         {
+            if (keysLocked)
+                return entity;
+
             var mapper = this.configuration.GetKeyMappers<TEntity>();
             entity.PartitionKey = mapper.PartitionKeyMapper(entity.InnerObject);
             entity.RowKey = mapper.RowKeyMapper(entity.InnerObject);
             return entity;
-
         }
 
         /// <summary>
@@ -48,7 +54,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// <returns>
         ///     An enumerable collection of <see cref="T:Microsoft.WindowsAzure.Storage.Table.DynamicTableEntity" /> objects, representing table entities returned by the query.
         /// </returns>
-        internal IEnumerable<T> ExecuteQuery<T>(ITableQuery tableQuery) where T : ITableEntity, new()
+        internal IEnumerable<T> ExecuteQuery<T>(ITableQuery tableQuery) where T : ITableEntity,new()
         {
             var query = new TableQuery<T>
             {
@@ -57,6 +63,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 TakeCount = tableQuery.TakeCount
             };
 
+          
             return table.ExecuteQuery(query);
         }
 
@@ -68,7 +75,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// <returns>
         ///     An enumerable collection of <see cref="T:Microsoft.WindowsAzure.Storage.Table.DynamicTableEntity" /> objects, representing table entities returned by the query.
         /// </returns>
-        internal Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity, new()
+        internal Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity,new()
         {
             var query = new TableQuery<T>
             {
@@ -148,24 +155,28 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public void Add(TEntity entity)
         {
-            base.Add(new EntityAdapter<TEntity>(entity));
+            base.Add(new EntityAdapter<TEntity>(configuration,entity));
+        }
+        public void Add(TEntity entity, string partitionKey, string rowKey)
+        {
+            base.Add(new EntityAdapter<TEntity>(configuration, entity),partitionKey,rowKey);
         }
         public void Delete(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
             if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Delete(new EntityAdapter<TEntity>(entity, _state.Item1, _state.Item2));
+                base.Delete(new EntityAdapter<TEntity>(configuration,entity, _state.Item1, _state.Item2));
             else
-                base.Delete(new EntityAdapter<TEntity>(entity, null, "*"));
+                base.Delete(new EntityAdapter<TEntity>(configuration,entity, null, "*"));
 
         }
         public void Update(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
             if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Update(new EntityAdapter<TEntity>(entity, _state.Item1, _state.Item2));
+                base.Update(new EntityAdapter<TEntity>(configuration,entity, _state.Item1, _state.Item2));
             else
-                base.Update(new EntityAdapter<TEntity>(entity, null, "*"));
+                base.Update(new EntityAdapter<TEntity>(configuration,entity, null, "*"));
 
         }
 
@@ -176,7 +187,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
 
 
-        public  async Task<TEntity> FindByIndexAsync(params Object[] keys)
+        public new async Task<TEntity> FindByIndexAsync(params Object[] keys)
         {
             var result =  (await base.FindByIndexAsync(keys));
             if(result==null)
@@ -189,12 +200,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
 
-        public async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
+        public new async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
         {
             var result = (await base.FindByKeysAsync(partitionKey, rowKey));
             if (result == null)
                 return default(TEntity);
-            return SetCollections<TEntity>(result.InnerObject);
+            return SetCollections(result).InnerObject;
         }
 
 
@@ -265,6 +276,18 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
 
         public IQueryable<TEntity> BaseQuery { get; set; }
-     
+
+
+
+
+
+
+        public new async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
+        {
+            var result = await base.ExecuteQuerySegmentedAsync(query, currentToken);
+            return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Item1.Select(e => e.InnerObject), result.Item2);
+
+             
+        }
     }
 }

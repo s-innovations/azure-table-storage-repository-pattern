@@ -23,7 +23,7 @@ namespace Microsoft.WindowsAzure.Storage.Table
         public static Task<IEnumerable<T>> ExecuteQueryAsync<T>(
             this CloudTable cloudTable,
             TableQuery<T> tableQuery,
-            CancellationToken cancellationToken = default(CancellationToken)) where T : ITableEntity, new()
+            CancellationToken cancellationToken = default(CancellationToken)) where T : ITableEntity,new()
         {
             return ExecuteQuerySegmentedImplAsync(
                 cloudTable, new List<T>(), tableQuery, null, cancellationToken)
@@ -45,7 +45,7 @@ namespace Microsoft.WindowsAzure.Storage.Table
             List<T> tableEntities,
             TableQuery<T> tableQuery,
             TableContinuationToken continuationToken,
-            CancellationToken cancellationToken = default (CancellationToken)) where T : ITableEntity, new()
+            CancellationToken cancellationToken = default (CancellationToken)) where T : ITableEntity,new()
         {
             return cloudTable
                 .ExecuteQuerySegmentedAsync(tableQuery, continuationToken, cancellationToken)

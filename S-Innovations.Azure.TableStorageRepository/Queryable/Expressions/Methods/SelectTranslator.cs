@@ -65,6 +65,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
             }else if(lambda.Body.NodeType == ExpressionType.Parameter)
             {
                 // from ent in source select ent.
+
+
             }else if(lambda.Body.NodeType == ExpressionType.MemberAccess)
             {
                 //from ent in source select ent.Name

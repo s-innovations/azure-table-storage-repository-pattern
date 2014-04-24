@@ -1,7 +1,9 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -10,9 +12,22 @@ using System.Threading.Tasks.Dataflow;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
+    internal static class StringExtensions
+    {
+        public static string Base64Encode(this string plainText)
+        {
+            var plainTextBytes = Encoding.UTF8.GetBytes(plainText);
+            return Convert.ToBase64String(plainTextBytes);
+        }
 
+        public static string Base64Decode(this string base64EncodedData)
+        {
+            var base64EncodedBytes = Convert.FromBase64String(base64EncodedData);
+            return Encoding.UTF8.GetString(base64EncodedBytes);
+        }
+    }
 
-    public abstract class TableRepository<TEntity> where TEntity : ITableEntity
+    public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
     {
         private List<EntityStateWrapper<TEntity>> _cache = new List<EntityStateWrapper<TEntity>>();
         protected readonly CloudTable table;
@@ -35,6 +50,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity });
         }
+        public virtual void Add(TEntity entity,string partitionkey, string rowkey)
+        {
+            entity.PartitionKey = partitionkey;
+            entity.RowKey = rowkey;
+            this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity, KeysLocked=true });
+        }
+
         public void Delete(TEntity entity)
         {
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Deleted, Entity = entity });
@@ -52,47 +74,50 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             var result = await table.ExecuteAsync(TableOperation.Retrieve<TEntity>(partitionkey, rowkey));
             return SetCollections((TEntity)result.Result);
         }
-
+        public Task DeleteByKey(string partitionKey, string rowKey)
+        {
+            return table.ExecuteAsync(TableOperation.Delete(new TableEntity(partitionKey, rowKey) { ETag = "*" }));
+        }
         public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
         {
-
-
-            foreach (var index in configuration.Indexes.Values)
+            foreach (var index in configuration.Indexes.Values.GroupBy(idx => idx.TableName ?? configuration.TableName + "Index"))
             {
-                var table = context.GetTable(index.TableName ?? configuration.TableName + "Index");
+                var table = context.GetTable(index.Key);
 
-                var opr = TableOperation.Retrieve<IndexEntity>(string.Join("__", keys.Select(k => k.ToString())), "");
-                var result = await table.ExecuteAsync(opr);
-                if (result.Result != null)
+                //TODO Optimize by executing all indexes at the same time and return the first found result.
+                foreach (var idxConfig in index)
                 {
-                    var idxEntity = result.Result as IndexEntity;
-                    var entity = await this.table.ExecuteAsync(TableOperation.Retrieve<TEntity>(idxEntity.RefPartitionKey, idxEntity.RefRowKey));
-                    return SetCollections((TEntity)entity.Result);
+                    var opr = TableOperation.Retrieve<IndexEntity>(idxConfig.GetIndexKeyFunc(keys), "");
+                    var result = await table.ExecuteAsync(opr);
+                    if (result.Result != null)
+                    {
+                        var idxEntity = result.Result as IndexEntity;
+                        var entity = await this.table.ExecuteAsync(TableOperation.Retrieve<TEntity>(idxEntity.RefPartitionKey, idxEntity.RefRowKey));
+                        return SetCollections((TEntity)entity.Result);
+                    }
                 }
 
             }
             return default(TEntity);
         }
 
-        private static MethodInfo QueryFilterMethod = typeof(CollectionConfiguration).GetMethod("GetFilterQuery");
-        protected T SetCollections<T>(T entity)
+       
+        protected TEntity SetCollections(TEntity entity)
         {
-            if (typeof(T) != typeof(TEntity))
-                return entity;
+            //if (typeof(T) != typeof(TEntity))
+            //    return entity;
 
             if (entity == null)
                 return entity;
 
+            IEntityAdapter adapter = entity as IEntityAdapter;
+            object obj = entity;
+            if (adapter!=null)
+               obj = adapter.GetInnerObject();
+
             foreach (var collectionInfo in configuration.Collections)
             {
-
-
-                var repository = collectionInfo.Activator(context);
-
-                QueryFilterMethod.MakeGenericMethod(collectionInfo.ParentEntityType, collectionInfo.EntityType)
-                    .Invoke(collectionInfo, new object[] { repository, entity });
-
-                collectionInfo.PropertyInfo.SetValue(entity, repository);
+                collectionInfo.SetCollection(obj,context);
             }
             return entity;
         }
@@ -101,7 +126,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             if (!_cache.Any())
                 return;
-            await table.CreateIfNotExistsAsync();
+          //  await table.CreateIfNotExistsAsync();
 
             var indexes = new ConcurrentBag<EntityStateWrapper<IndexEntity>>();
 
@@ -110,6 +135,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
                 {
+                    Trace.WriteLine(string.Format("Batch<{0}> item<{3}>: {1} {2}", 
+                        batch.GetHashCode(),item.Entity.PartitionKey,item.Entity.RowKey,item.State));
+                    
                     switch (item.State)
                     {
                         case EntityState.Added:
@@ -138,11 +166,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                         case EntityState.Updated:
                             foreach (var collection in configuration.Collections)
                             {
-                                var rep = collection.PropertyInfo.GetValue(item.Entity) as ITableRepository;
+                                var rep = collection.PropertyInfo.GetValue(GetEntity(item.Entity)) as ITableRepository;
                                 await rep.SaveChangesAsync();
                             }
-
-
                             batchOpr.Add(TableOperation.Merge(item.Entity));
                             break;
                         case EntityState.Deleted:
@@ -153,13 +179,21 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     }
 
                 }
-                await table.ExecuteBatchAsync(batchOpr);
+                using (new TraceTimer(string.Format("Executing Batch length {0} to {1}", batchOpr.Count,table.Name)))
+                {
+
+                    //table.ExecuteBatch(batchOpr);
+                    if (batchOpr.Count == 1)
+                        await table.ExecuteAsync(batchOpr.First());
+                    else
+                        await table.ExecuteBatchAsync(batchOpr);
+                }
 
             }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = ExecutionDataflowBlockOptions.Unbounded });
 
             using (new TraceTimer("Handling Entities"))
             {
-                var batches = _cache.GroupBy(b => SetKeys(b.Entity).PartitionKey);
+                var batches = _cache.GroupBy(b => SetKeys(b.Entity,b.KeysLocked).PartitionKey);
                 foreach (var group in batches)
                     foreach (var batch in group
                           .Select((x, i) => new { Group = x, Index = i })
@@ -167,9 +201,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                           .Select(x => x.Select(v => v.Group).ToArray())
                           .Select(t => t.ToArray()))
                     {
-
-
-
+                        Trace.WriteLine(string.Format("Posting Batch of lenght: {0}", batch.Length));
                         actionblock.Post(batch);
                     }
                 actionblock.Complete();
@@ -209,8 +241,20 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             _cache = new List<EntityStateWrapper<TEntity>>();
 
         }
-        protected virtual TEntity SetKeys(TEntity entity)
+
+        private object GetEntity(object entity)
         {
+            var ent = entity as IEntityAdapter;
+            if (ent != null)
+                return ent.GetInnerObject();
+            return ent;
+        }
+
+        protected virtual TEntity SetKeys(TEntity entity,bool keysLocked)
+        {
+            if (keysLocked)
+                return entity;
+
             var mapper = this.configuration.GetKeyMappers<TEntity>();
             entity.PartitionKey = mapper.PartitionKeyMapper(entity);
             entity.RowKey = mapper.RowKeyMapper(entity);
@@ -219,6 +263,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         private TableOperation GetInsertionOperation<Entity>(Entity item) where Entity : ITableEntity
         {
+            Trace.TraceInformation(string.Join(", ", item.WriteEntity(null).Select(d => string.Format("{0} {1}", d.Key, d.Value.PropertyType))));
+
             TableOperation opr;
             switch (this.context.InsertionMode)
             {
@@ -238,5 +284,18 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return opr;
         }
 
+
+        public async Task<Tuple<IEnumerable<TEntity>,TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
+        {
+            var q = new TableQuery<TEntity>{
+                 FilterString = query.FilterString,
+                 SelectColumns = query.SelectColumns,
+                  TakeCount = query.TakeCount
+            };
+            var result = await table.ExecuteQuerySegmentedAsync<TEntity>(q, currentToken);
+            return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Results, result.ContinuationToken);
+
+        }
+       
     }
 }

@@ -28,7 +28,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
         /// <returns>
         ///     An enumerable collection of <see cref="T:Microsoft.WindowsAzure.Storage.Table.DynamicTableEntity" /> objects, representing table entities returned by the query.
         /// </returns>
-        IEnumerable<T> ExecuteQuery<T>(ITableQuery tableQuery) where T : ITableEntity,new();
+        IEnumerable<T> ExecuteQuery<T>(ITableQuery tableQuery) where T : ITableEntity;
 
         /// <summary>
         ///     Executes a query on a table asynchronously.
@@ -38,7 +38,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
         /// <returns>
         ///     An enumerable collection of <see cref="T:Microsoft.WindowsAzure.Storage.Table.DynamicTableEntity" /> objects, representing table entities returned by the query.
         /// </returns>
-        Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity,new();
+        Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity;
 
         /// <summary>
         ///     Executes the operation on a table.

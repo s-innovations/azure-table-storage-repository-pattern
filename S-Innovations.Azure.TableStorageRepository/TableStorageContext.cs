@@ -1,5 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.DataInitializers;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections.Generic;
@@ -42,7 +43,8 @@ namespace SInnovations.Azure.TableStorageRepository
    }
     public abstract class TableStorageContext : ITableStorageContext
     {
-        private readonly TableStorageModelBuilder modelbuilder;
+        private static object _buildLock = new object();
+       
         public InsertionMode InsertionMode { get; set; }
 
         private readonly CloudTableClient _client;
@@ -54,11 +56,27 @@ namespace SInnovations.Azure.TableStorageRepository
         {
 
             _client = storage.CreateCloudTableClient();
-            
-            modelbuilder = new TableStorageModelBuilder();
-            OnModelCreating(modelbuilder);
-            BuildModel(modelbuilder);
 
+
+            TableStorageModelBuilder builder =
+                EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
+                    this.GetType(), (key) =>
+                    {
+                            builder = new TableStorageModelBuilder();
+                            OnModelCreating(builder);
+                            return builder;
+                    });
+        
+
+            BuildModel(builder);
+
+          
+            if(Table.inits.ContainsKey(this.GetType()))
+            {
+                var init = Table.inits[this.GetType()];
+                init.Initialize(this, builder);
+                Table.inits.Remove(this.GetType());
+            }
 
             InsertionMode = InsertionMode.Add;
         }
@@ -72,9 +90,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
           
         }
-
-
-
+        
 
         public TableEntityRepository<TEntity> TableEntityRepository<TEntity>() where TEntity : ITableEntity,new()
         {
@@ -83,7 +99,11 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public Task SaveChangesAsync()
         {
-            return Task.WhenAll(repositories.Select(rep => rep.SaveChangesAsync()));
+           // foreach (var rep in repositories)
+           // {
+           //     await rep.SaveChangesAsync();
+           // }
+           return Task.WhenAll(repositories.Select(rep => rep.SaveChangesAsync()));
         }
 
 
@@ -107,8 +127,8 @@ namespace SInnovations.Azure.TableStorageRepository
                     var EntityType = repository.PropertyType.GenericTypeArguments[0];
                     var IsEntityType= (typeof(ITableEntity).IsAssignableFrom(EntityType));
                     var TableRepositoryType = IsEntityType?TableEntityRepositoryType:TablePocoRepositoryType;
-                 
-                    var argumetns = new Object[] {this, modelbuilder._configurations[EntityType]};
+
+                    var argumetns = new Object[] { this, EntityTypeConfigurationsContainer.Configurations[EntityType] };
 
                     var rep = Activator.CreateInstance(
                         TableRepositoryType.MakeGenericType(EntityType), argumetns) as ITableRepository;
@@ -131,8 +151,10 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public CloudTable GetTable<T1>()
         {
-            return _client.GetTableReference(modelbuilder._configurations[typeof(T1)].TableName);
+            return _client.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName);
         }
+
+
 
 
     }

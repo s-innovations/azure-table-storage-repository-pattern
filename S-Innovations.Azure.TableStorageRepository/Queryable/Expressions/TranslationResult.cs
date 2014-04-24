@@ -26,6 +26,10 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
             get { return _tableQuery; }
         }
 
+        internal TableQuery GetTableQuery()
+        {
+            return _tableQuery._tableQuery;
+        }
         /// <summary>
         ///     Gets a post processing handler.
         /// </summary>

@@ -1,4 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,13 +11,21 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
     public interface ITableRepository
     {
         Task SaveChangesAsync();
+
+
     }
 
     public interface ITableRepository<TEntity> : ITableRepository,
         ICollection<TEntity>, 
         IQueryable<TEntity>
     {
-        //void Add(TEntity entity);
+        /// <summary>
+        /// Overrides the modelbuild key selectors.
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <param name="partitionkey"></param>
+        /// <param name="rowkey"></param>
+        void Add(TEntity entity,string partitionkey,string rowkey);
         void Delete(TEntity entity);
         void Update(TEntity entity);
 
@@ -25,5 +34,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         IEnumerable<TEntity> FluentQuery(string filter);
         Task<TEntity> FindByIndexAsync(params object[] keys);
         Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey);
+        Task DeleteByKey(string partitionKey, string rowKey);
+
+        Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken);
     }
 }

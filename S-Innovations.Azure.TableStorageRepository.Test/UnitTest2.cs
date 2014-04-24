@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Table;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -33,6 +35,13 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public virtual ICollection<SubItem> Items { get; set; }
     }
 
+    public class MyTestClass
+    {
+        public string LolKey { get; set; }
+        public string Name { get; set; }
+
+        public ICollection<SubItem> Items {get;set;}
+    }
     public class SubItem
     {
         public string Name { get; set; }
@@ -58,8 +67,15 @@ namespace SInnovations.Azure.TableStorageRepository.Test
                 .HasKeys(y => y.Name, y => y.LastName)
                 .WithCollectionOf(t=>t.Items,(source,item) => (from i in source where i.Name == item.Name select i))
                 .ToTable("testsfds");
-           
 
+
+            modelbuilder.Entity<MyTestClass>()
+                .HasKeys(y => y.LolKey, t => "")
+                .WithPropertyOf(t => t.Items)//, 
+                  //  p => JsonConvert.DeserializeObject<List<SubItem>>(p.StringValue), 
+                  //  p => new EntityProperty(JsonConvert.SerializeObject(p)))
+                .ToTable("tesdsfaa");
+                
             
             base.OnModelCreating(modelbuilder);
         }
@@ -67,11 +83,43 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public ITableRepository<MyTestPoco> People { get; set; }
         public ITableRepository<MyTestPocoEntity> People1 { get; set; }
         public ITableRepository<SubItem> SubItems { get; set; }
+
+        public ITableRepository<MyTestClass> TestLocalItems { get; set; }
         
     }
     [TestClass]
     public class UnitTest2
     {
+
+          [TestMethod]
+        public async Task TestLocalItems()
+        {
+            var context = new NewTableStorageContext();
+
+            context.TestLocalItems.Add(
+                new MyTestClass
+                {
+                    LolKey = "adsad",
+                    Name = "adsad",
+                    Items = new List<SubItem>{ 
+                        new SubItem
+                        {
+                            LastName="adsa", 
+                            Name="sda"
+                        },
+                        new SubItem
+                        { 
+                            LastName="adsa",
+                            Name="sda"
+                        } 
+                    }
+                });
+            await context.SaveChangesAsync();
+
+            var items = (from ent in context.TestLocalItems select ent).ToArray();
+            Trace.WriteLine(JsonConvert.SerializeObject(items));
+            Trace.WriteLine(items.First().Items.GetType().ToString());
+        }
         [TestMethod]
         public async Task SelectAll()
         {

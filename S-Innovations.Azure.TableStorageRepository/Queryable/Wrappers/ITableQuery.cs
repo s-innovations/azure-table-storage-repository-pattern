@@ -8,8 +8,10 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
     /// <summary>
     ///     <see cref="TableQuery" /> public interface.
     /// </summary>
-    internal interface ITableQuery
+    public interface ITableQuery
     {
+
+
         /// <summary>
         ///     Gets or sets the number of entities the table query will return.
         /// </summary>

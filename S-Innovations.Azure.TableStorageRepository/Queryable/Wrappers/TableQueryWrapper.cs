@@ -12,7 +12,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
     /// </summary>
     internal sealed class TableQueryWrapper : ITableQuery
     {
-        private readonly TableQuery _tableQuery;
+        internal readonly TableQuery _tableQuery;
 
         /// <summary>
         ///     Constructor.

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -15,28 +16,36 @@ namespace SInnovations.Azure.TableStorageRepository
         [IgnoreProperty]
         public IndexConfiguration Config { get; set; }
     }
-    public interface EntityAdapter
+    internal interface IEntityAdapter
     {
         object GetInnerObject();
+        IDictionary<string, EntityProperty> Properties { get; }
     }
-    public class EntityAdapter<T> : ITableEntity where T : new()
+    internal interface IEntityAdapter<T> : IEntityAdapter
     {
-
+        T InnerObject { get; }
+    }
+    public class EntityAdapter<T> : IEntityAdapter, ITableEntity
+    {
+        EntityTypeConfiguration<T> config;
         public EntityAdapter()
         {
             // If you would like to work with objects that do not have a default Ctor you can use (T)Activator.CreateInstance(typeof(T));
-            this.InnerObject = new T();
+         //   this.InnerObject = new T();
+            this.config = EntityTypeConfigurationsContainer.Entity<T>();
         }
 
-        public EntityAdapter(T innerObject,DateTimeOffset? timestamp=null, string Etag=null)
+        internal EntityAdapter(EntityTypeConfiguration<T> config, T innerObject, DateTimeOffset? timestamp = null, string Etag = null)
         {
             this.InnerObject = innerObject;
             if (timestamp.HasValue)
                 this.Timestamp = timestamp.Value;
             this.ETag = Etag;
+            this.config = config;
         }
         public object GetInnerObject() { return InnerObject; }
         public T InnerObject { get; set; }
+
 
         public EntityState State { get; set; }
         /// <summary>
@@ -65,12 +74,53 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public virtual void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
         {
+            //Create the Entity Object Type
+            this.InnerObject = config.CreateEntity(properties);
+            //Read all default supported types from table entity
             TableEntity.ReadUserObject(this.InnerObject, properties, operationContext);
+            
+            //Read all custom properties configured.
+            var tasks = new List<Task>();
+            foreach (var propInfo in config.Properties)
+            {
+                if (properties.ContainsKey(propInfo.PropertyInfo.Name))
+                {
+                    var prop = properties[propInfo.PropertyInfo.Name];
+                    tasks.Add(propInfo.SetPropertyAsync(this.InnerObject, prop));
+                }
+            }
+            Task.WaitAll(tasks.ToArray());
+
+            //Set the properties
+            Properties = properties;
         }
 
         public virtual IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
         {
-            return TableEntity.WriteUserObject(this.InnerObject, operationContext);
+
+            if (this.InnerObject == null){                
+                return new Dictionary<string, EntityProperty>();
+            }
+
+            
+            IDictionary<string, EntityProperty>  properties = TableEntity.WriteUserObject(this.InnerObject, operationContext);
+            var all = Task.WhenAll(config.Properties
+            .Select(async propInfo =>
+                new
+                {
+                    Key = propInfo.PropertyInfo.Name,
+                    Property = await propInfo.GetPropertyAsync(this.InnerObject)
+                })).Result;
+
+            foreach (var propInfo in all.Where(p => p.Property != null))
+            {
+                properties.Add(propInfo.Key, propInfo.Property);
+            }
+            
+            return properties;
         }
+
+        public virtual IDictionary<string, EntityProperty> Properties { get; set; }
+
     }
 }

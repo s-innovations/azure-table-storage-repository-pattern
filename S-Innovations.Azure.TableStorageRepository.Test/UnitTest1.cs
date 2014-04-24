@@ -213,7 +213,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         {
             string test = "";
             var c = new Pet();
-            EntityTypeConfiguration<Pet>.ConvertToStringKey(t => new { t.FamilyName, t.RowKey }, out test);
+            EntityTypeConfiguration<Pet>.ConvertToStringKey(t => new { t.FamilyName, t.RowKey }, out test,new string[]{});
 
 
         }

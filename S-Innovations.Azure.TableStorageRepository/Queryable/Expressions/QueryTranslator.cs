@@ -54,7 +54,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
 
             // Visit arguments
             for (int i = 0; i < methodCall.Arguments.Count; i++)
-            {
+                {
                 Expression argument = methodCall.Arguments[i];
                 if (argument.NodeType == ExpressionType.Call)
                 {
