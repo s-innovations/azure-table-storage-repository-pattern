@@ -10,6 +10,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
+using SInnovations.Azure.TableStorageRepository.Queryable;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -65,6 +66,13 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             await context.SaveChangesAsync();
 
             var result = await context.Models.FindByIndexAsync("poul","google");
+
+            var testAsync = await (from ent in context.Models
+                            where ent.Item2 == "poul"
+                            select ent).ToListAsync();
+            Assert.AreEqual((from ent in context.Models where ent.Item2 == "poul" select ent).ToArray().Length, testAsync.Count);
+
+            Trace.TraceInformation(testAsync.Count.ToString());
         }
        
    
