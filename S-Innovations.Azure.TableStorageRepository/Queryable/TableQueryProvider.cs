@@ -175,8 +175,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             //foreach (var entity in enumerable)
           //  {
                 //TODO: key should properly be row+part key
-                _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
-                    (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
+             //   _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
+            //        (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
             
             //Set properties that infact are the part/row key
             _entityConfiguration.ReverseKeyMapping<TEntity>(entity);

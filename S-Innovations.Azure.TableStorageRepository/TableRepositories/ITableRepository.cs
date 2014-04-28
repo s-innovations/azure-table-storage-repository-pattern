@@ -26,6 +26,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// <param name="partitionkey"></param>
         /// <param name="rowkey"></param>
         void Add(TEntity entity,string partitionkey,string rowkey);
+
+        void Add(TEntity entity, IDictionary<string, EntityProperty> additionalProperties);
         void Delete(TEntity entity);
         void Update(TEntity entity);
 

@@ -161,6 +161,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             base.Add(new EntityAdapter<TEntity>(configuration, entity),partitionKey,rowKey);
         }
+        public void Add(TEntity entity, IDictionary<string,EntityProperty> additionalProperties){
+            base.Add(new EntityAdapter<TEntity>(configuration, entity) { Properties = additionalProperties });
+        }
+
         public void Delete(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;

@@ -102,5 +102,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return table.CreateQuery<TEntity>().Provider;
             }
         }
+
+
+        public void Add(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
