@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections;
@@ -14,6 +15,7 @@ namespace SInnovations.Azure.TableStorageRepository
 {
     public interface ITableStorageContext: IDisposable
     {
+        IRetryPolicy RetryPolicy { get; set; }
         InsertionMode InsertionMode { get; set; }
         CloudTable GetTable(string name);
     }

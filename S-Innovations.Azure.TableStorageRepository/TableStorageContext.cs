@@ -43,19 +43,20 @@ namespace SInnovations.Azure.TableStorageRepository
    }
     public abstract class TableStorageContext : ITableStorageContext
     {
+        private readonly CloudStorageAccount _storage;
         private static object _buildLock = new object();
        
         public InsertionMode InsertionMode { get; set; }
 
-        private readonly CloudTableClient _client;
+        private readonly Lazy<CloudTableClient> _client;
         private List<ITableRepository> repositories = new List<ITableRepository>();
 
 
         public bool AutoSaveOnDispose { get; set; }
         public TableStorageContext(CloudStorageAccount storage)
         {
-
-            _client = storage.CreateCloudTableClient();
+            _storage = storage;
+            _client = new Lazy<CloudTableClient>(CreateClient);
 
 
             TableStorageModelBuilder builder =
@@ -144,18 +145,31 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public CloudTable GetTable(string name)
         {
-            var tbl= _client.GetTableReference(name);
+            var tbl= _client.Value.GetTableReference(name);
             tbl.CreateIfNotExists();
             return tbl;
         }
 
         public CloudTable GetTable<T1>()
         {
-            return _client.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName);
+            return _client.Value.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName);
+        }
+
+
+        private CloudTableClient CreateClient()
+        {
+           var client= _storage.CreateCloudTableClient();
+           if (this.RetryPolicy != null)
+               client.RetryPolicy = RetryPolicy;
+
+           return client;
         }
 
 
 
-
+        public Microsoft.WindowsAzure.Storage.RetryPolicies.IRetryPolicy RetryPolicy
+        {
+            get;set;
+        }
     }
 }
