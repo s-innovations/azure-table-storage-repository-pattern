@@ -32,6 +32,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             _provider = new TableQueryProvider<TEntity>(this, configuration);
         }
 
+        public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
+        {
+            return table.CreateQuery<T>();            
+        }
 
         //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)

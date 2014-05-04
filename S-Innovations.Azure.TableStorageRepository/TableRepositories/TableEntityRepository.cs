@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
+    [Obsolete]
     public class TableEntityRepository<TEntity> :
            TableRepository<TEntity>,
            ITableRepository<TEntity>
@@ -105,6 +106,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
         public void Add(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
         {
             throw new NotImplementedException();
         }
