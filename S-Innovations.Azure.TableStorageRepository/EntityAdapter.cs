@@ -116,6 +116,7 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 properties.Add(propInfo.Key, propInfo.Property);
             }
+            if (Properties != null)
             foreach (var propInfo in Properties)
             {
                 if (!properties.ContainsKey(propInfo.Key))
