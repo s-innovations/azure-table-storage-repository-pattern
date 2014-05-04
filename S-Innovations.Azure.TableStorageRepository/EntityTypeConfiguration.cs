@@ -158,6 +158,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
 
+
+
         public TEntityType CreateEntity(IDictionary<string, EntityProperty> properties)
         {
             if (CtorExpression != null)
@@ -464,6 +466,8 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             return type.IsPrimitive || type == typeof(string) || type == typeof(Guid);
         }
+
+
 
 
 

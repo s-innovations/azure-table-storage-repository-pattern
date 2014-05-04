@@ -202,11 +202,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return default(TEntity);
             return result.InnerObject;
         }
-
-
-
-
-
+        
 
         public new async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
         {
@@ -215,7 +211,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return default(TEntity);
             return SetCollections(result).InnerObject;
         }
-
+        public async Task<IDictionary<string,EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey)
+        {
+            var result = (await base.FindByKeysAsync(partitionKey, rowKey));
+            if (result == null)
+                return new Dictionary<string, EntityProperty>();
+            return result.Properties;
+        }
 
         public bool Contains(TEntity item)
         {
@@ -297,5 +299,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
              
         }
+
+
+
     }
 }

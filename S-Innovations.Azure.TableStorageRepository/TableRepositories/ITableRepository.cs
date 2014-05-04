@@ -40,6 +40,6 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken);
 
-        TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new();
+        Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey);
     }
 }

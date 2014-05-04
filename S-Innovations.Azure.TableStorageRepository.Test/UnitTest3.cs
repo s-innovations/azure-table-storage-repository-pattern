@@ -26,6 +26,11 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public string Item5 { get; set; }
     }
 
+    public class MyModel2 : MyModel
+    {
+        public string Item6 { get; set; }
+    }
+
     public class Context : TableStorageContext
     {
         public Context()
@@ -59,8 +64,8 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public async Task TestLocalItems()
         {
             var context = new Context();
-              
-            context.Models.Add(new MyModel { Item1 = Guid.NewGuid().ToString(), Item2="poul",Item3="google" });
+
+            context.Models.Add(new MyModel2 { Item1 = Guid.NewGuid().ToString(), Item2 = "poul", Item3 = "google", Item6="test6" });
 
 
             await context.SaveChangesAsync();
@@ -70,6 +75,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             var testAsync = await (from ent in context.Models
                             where ent.Item2 == "poul"
                             select ent).ToListAsync();
+
             Assert.AreEqual((from ent in context.Models where ent.Item2 == "poul" select ent).ToArray().Length, testAsync.Count);
 
             Trace.TraceInformation(testAsync.Count.ToString());

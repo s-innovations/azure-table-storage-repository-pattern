@@ -72,6 +72,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         public virtual async Task<TEntity> FindByKeysAsync(string partitionkey, string rowkey)
         {
             var result = await table.ExecuteAsync(TableOperation.Retrieve<TEntity>(partitionkey, rowkey));
+          
             return SetCollections((TEntity)result.Result);
         }
         public Task DeleteByKey(string partitionKey, string rowKey)
