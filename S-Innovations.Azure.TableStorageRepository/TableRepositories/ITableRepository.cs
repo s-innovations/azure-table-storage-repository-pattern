@@ -39,7 +39,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         Task DeleteByKey(string partitionKey, string rowKey);
 
         Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken);
-
+        CloudTable Table
+        {
+            get;
+        }
         Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey);
     }
 }
