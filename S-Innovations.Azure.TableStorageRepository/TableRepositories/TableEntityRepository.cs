@@ -111,21 +111,16 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
 
 
-        public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
-        {
-            throw new NotImplementedException();
-        }
-
-
-        public ITableRepository<T1> AsType<T1>()
-        {
-            throw new NotImplementedException();
-        }
-
 
         public Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey)
         {
             throw new NotImplementedException();
+        }
+
+
+        public CloudTable Table
+        {
+            get { return table; }
         }
     }
 }
