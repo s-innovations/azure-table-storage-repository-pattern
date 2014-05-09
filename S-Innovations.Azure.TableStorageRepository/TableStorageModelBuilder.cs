@@ -9,7 +9,7 @@ namespace SInnovations.Azure.TableStorageRepository
     public static class EntityTypeConfigurationsContainer
     {
         static internal ConcurrentDictionary<Type, EntityTypeConfiguration> Configurations = new ConcurrentDictionary<Type, EntityTypeConfiguration>();
-        static internal ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>> ModelBuilders = new ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>>(); 
+        static internal ConcurrentDictionary<Type, TableStorageModelBuilder> ModelBuilders = new ConcurrentDictionary<Type, TableStorageModelBuilder>(); 
 
         public static  EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
         {

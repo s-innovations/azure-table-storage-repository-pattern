@@ -52,29 +52,42 @@ namespace SInnovations.Azure.TableStorageRepository
         private List<ITableRepository> repositories = new List<ITableRepository>();
 
         public bool AutoSaveOnDispose { get; set; }
+        private static object _lock = new object();
         public TableStorageContext(CloudStorageAccount storage)
         {
             _storage = storage;
             _client = new Lazy<CloudTableClient>(CreateClient);
 
 
-            Lazy<TableStorageModelBuilder> builder =
-                EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
-                    this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
-                    {
-                            var abuilder = new TableStorageModelBuilder();
-                            OnModelCreating(abuilder);
-                            return abuilder;
-                    }));
-        
+            //TableStorageModelBuilder builder =
+            //    EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
+            //        this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
+            //        {
+            //                var abuilder = new TableStorageModelBuilder();
+            //                OnModelCreating(abuilder);
+            //                return abuilder;
+            //        }));
+            TableStorageModelBuilder builder;
+            if (EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()))
+                EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder);
+            else
+            {
+                lock(_lock)
+                {
+                    builder = new TableStorageModelBuilder();
+                    OnModelCreating(builder);
+                    EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
+                }
+            }
 
-            BuildModel(builder.Value);
+
+            BuildModel(builder);
 
           
             if(Table.inits.ContainsKey(this.GetType()))
             {
                 var init = Table.inits[this.GetType()];
-                init.Initialize(this, builder.Value);
+                init.Initialize(this, builder);
                 Table.inits.Remove(this.GetType());
             }
 
