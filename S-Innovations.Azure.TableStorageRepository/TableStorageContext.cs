@@ -51,7 +51,6 @@ namespace SInnovations.Azure.TableStorageRepository
         private readonly Lazy<CloudTableClient> _client;
         private List<ITableRepository> repositories = new List<ITableRepository>();
 
-
         public bool AutoSaveOnDispose { get; set; }
         public TableStorageContext(CloudStorageAccount storage)
         {
@@ -59,23 +58,23 @@ namespace SInnovations.Azure.TableStorageRepository
             _client = new Lazy<CloudTableClient>(CreateClient);
 
 
-            TableStorageModelBuilder builder =
+            Lazy<TableStorageModelBuilder> builder =
                 EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
-                    this.GetType(), (key) =>
+                    this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
                     {
-                            builder = new TableStorageModelBuilder();
-                            OnModelCreating(builder);
-                            return builder;
-                    });
+                            var abuilder = new TableStorageModelBuilder();
+                            OnModelCreating(abuilder);
+                            return abuilder;
+                    }));
         
 
-            BuildModel(builder);
+            BuildModel(builder.Value);
 
           
             if(Table.inits.ContainsKey(this.GetType()))
             {
                 var init = Table.inits[this.GetType()];
-                init.Initialize(this, builder);
+                init.Initialize(this, builder.Value);
                 Table.inits.Remove(this.GetType());
             }
 
