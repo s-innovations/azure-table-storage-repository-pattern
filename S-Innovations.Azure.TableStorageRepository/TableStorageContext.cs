@@ -74,9 +74,14 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 lock(_lock)
                 {
-                    builder = new TableStorageModelBuilder();
-                    OnModelCreating(builder);
-                    EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
+                    //Check that if it was added
+                    if (!(EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()) 
+                        && EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder)))
+                    {
+                        builder = new TableStorageModelBuilder();
+                        OnModelCreating(builder);
+                        EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
+                    }
                 }
             }
 
