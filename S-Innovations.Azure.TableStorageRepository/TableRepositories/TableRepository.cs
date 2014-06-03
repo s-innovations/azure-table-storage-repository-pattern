@@ -136,8 +136,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
                 {
-                    Trace.WriteLine(string.Format("Batch<{0}> item<{3}>: {1} {2}", 
-                        batch.GetHashCode(),item.Entity.PartitionKey,item.Entity.RowKey,item.State));
+                  //  Trace.WriteLine(string.Format("Batch<{0}> item<{3}>: {1} {2}", 
+                  //      batch.GetHashCode(),item.Entity.PartitionKey,item.Entity.RowKey,item.State));
                     
                     switch (item.State)
                     {
