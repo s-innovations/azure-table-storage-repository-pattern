@@ -264,8 +264,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         private TableOperation GetInsertionOperation<Entity>(Entity item) where Entity : ITableEntity
         {
-            Trace.TraceInformation(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType,d.Value.PropertyAsObject))));
-   
+             if (item.PartitionKey == null)
+            {
+               Trace.TraceError(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType,d.Value.PropertyAsObject))));     
+                throw new NullReferenceException("The partionKey was not set");
+            }
+
             TableOperation opr;
             switch (this.context.InsertionMode)
             {
