@@ -49,7 +49,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             if (this.configuration == null)
                 throw new Exception("Configuration was not created");
-            ;var mapper = this.configuration.GetKeyMappers<TEntity>();
+            var mapper = this.configuration.GetKeyMappers<TEntity>();
            
 
             if (mapper.PartitionKeyMapper == null)
