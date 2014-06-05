@@ -132,7 +132,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public List<PropertyConfiguration> Properties { get; set; }
 
         public string TableName { get; protected set; }
-
+            
         public KeysMapper<TEntity> GetKeyMappers<TEntity>()
         {
             return (KeysMapper<TEntity>)KeyMapper;
