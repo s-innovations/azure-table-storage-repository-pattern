@@ -176,9 +176,12 @@ namespace SInnovations.Azure.TableStorageRepository
         private CloudTableClient CreateClient()
         {
            var client= _storage.CreateCloudTableClient();
-           if (this.RetryPolicy != null)
-               client.RetryPolicy = RetryPolicy;
 
+           
+           if (this.RetryPolicy != null)
+               client.DefaultRequestOptions.RetryPolicy = RetryPolicy;
+            if(this.TablePayloadFormat.HasValue)
+                client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat;
            return client;
         }
 
@@ -187,6 +190,11 @@ namespace SInnovations.Azure.TableStorageRepository
         public Microsoft.WindowsAzure.Storage.RetryPolicies.IRetryPolicy RetryPolicy
         {
             get;set;
+        }
+        public TablePayloadFormat? TablePayloadFormat
+        {
+            get;
+            set;
         }
     }
 }
