@@ -28,15 +28,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             this.configuration = configuration;
             _expression = Expression.Constant(this);
-            //var t = new CloudTableWrapper(table);
             _provider = new TableQueryProvider<TEntity>(this, configuration);
         }
-
         public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
         {
             return table.CreateQuery<T>();            
         }
-
         public CloudTable Table
         {
             get { return table; }
@@ -50,7 +47,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if (keysLocked)
                 return entity;
 
+            Trace.TraceInformation("{0}", this.configuration);
             var mapper = this.configuration.GetKeyMappers<TEntity>();
+            Trace.TraceInformation("{0}", mapper);
 
             if (mapper.PartitionKeyMapper == null)
                 throw new Exception("PartitionKeyMapper is Null");
