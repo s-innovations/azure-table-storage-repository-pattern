@@ -265,7 +265,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         private TableOperation GetInsertionOperation<Entity>(Entity item) where Entity : ITableEntity
         {
 //            Trace.TraceInformation(string.Join(", ", item.WriteEntity(null).Select(d => string.Format("{0} {1}", d.Key, d.Value.PropertyType))));
-
+           
             TableOperation opr;
             switch (this.context.InsertionMode)
             {

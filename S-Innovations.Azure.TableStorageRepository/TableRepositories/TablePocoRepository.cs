@@ -44,6 +44,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
         {
+            if (entity == null)
+                throw new ArgumentNullException("Entity is Null");
+
             if (keysLocked)
                 return entity;
 
