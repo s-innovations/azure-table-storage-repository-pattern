@@ -47,9 +47,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if (keysLocked)
                 return entity;
 
-            Trace.TraceInformation("{0}", this.configuration);
-            var mapper = this.configuration.GetKeyMappers<TEntity>();
-            Trace.TraceInformation("{0}", mapper);
+            if (this.configuration == null)
+                throw new Exception("Configuration was not created");
+            ;var mapper = this.configuration.GetKeyMappers<TEntity>();
+           
 
             if (mapper.PartitionKeyMapper == null)
                 throw new Exception("PartitionKeyMapper is Null");
