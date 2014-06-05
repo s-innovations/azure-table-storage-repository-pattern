@@ -48,8 +48,17 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return entity;
 
             var mapper = this.configuration.GetKeyMappers<TEntity>();
+
+            if (mapper.PartitionKeyMapper == null)
+                throw new Exception("PartitionKeyMapper is Null");
+            if (mapper.RowKeyMapper == null)
+                throw new Exception("RowKeyMapper is Null");
+            if (entity.InnerObject == null)
+                throw new Exception("Inner Object is null");
+
             entity.PartitionKey = mapper.PartitionKeyMapper(entity.InnerObject);
             entity.RowKey = mapper.RowKeyMapper(entity.InnerObject);
+           
             return entity;
         }
 
