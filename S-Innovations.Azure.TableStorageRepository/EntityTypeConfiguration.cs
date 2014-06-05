@@ -245,7 +245,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             Action<TEntityType, string> partitionAction = (obj, partitionkey) =>
             {
-                var parts = partitionkey.Split(new[] { "__" }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = partitionkey.Split(new[] { "__" }, StringSplitOptions.None);
 
                 for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
                 {
@@ -262,6 +262,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private object StringTo(Type type, string key)
         {
+            if (string.IsNullOrEmpty(key))
+                return null;
 
             if (type == typeof(string))
                 return key;
@@ -456,10 +458,11 @@ namespace SInnovations.Azure.TableStorageRepository
                     var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
                     var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name)));
                     
-                    if (objs.Any(p => p == null))
-                        return null;
-
-                    return string.Join("__", objs);
+                    //If any nulls, then the key becomes a enmpty string.
+                 //   if (objs.Any(p => p == null))
+                 //       return "";
+                    
+                    return string.Join("__", objs.Select(t=>t==null?"":t));
 
                 };
             }
