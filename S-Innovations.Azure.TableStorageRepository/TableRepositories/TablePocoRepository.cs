@@ -1,10 +1,10 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.Queryable;
-
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -55,10 +55,17 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 throw new Exception("RowKeyMapper is Null");
             if (entity.InnerObject == null)
                 throw new Exception("Inner Object is null");
+            try
+            {
+                entity.PartitionKey = mapper.PartitionKeyMapper(entity.InnerObject);
+                entity.RowKey = mapper.RowKeyMapper(entity.InnerObject);
 
-            entity.PartitionKey = mapper.PartitionKeyMapper(entity.InnerObject);
-            entity.RowKey = mapper.RowKeyMapper(entity.InnerObject);
-           
+            }catch(Exception ex)
+            {
+                Trace.TraceError(entity.PartitionKey);
+                Trace.TraceError(entity.RowKey);
+                throw;
+            }
             return entity;
         }
 

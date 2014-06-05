@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -199,6 +200,8 @@ namespace SInnovations.Azure.TableStorageRepository
                 this.NamePairs.Add(partitionKey, "PartitionKey");
             if (!string.IsNullOrEmpty(rowKey))
                 this.NamePairs.Add(rowKey, "RowKey");
+
+            Trace.TraceInformation("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
 
             Action<TEntityType, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
             Action<TEntityType, string> rowAction = GetReverseActionFrom<TRowKey>(RowKeyExpression);
@@ -439,16 +442,23 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             else if (expression.Body is NewExpression)
             {
+                Trace.TraceInformation("Using NewExpressino for KeyMapping");
                 var newEx = expression.Body as NewExpression;
                 key = string.Join("__", newEx.Members.Select(m => m.Name));
-
+             
                 return (o) =>
                 {
+                    if (o == null)
+                        throw new ArgumentNullException("Object cannot be null");
+
                     var obj = func(o);
+
                     var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
                     var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name)));
+                    
                     if (objs.Any(p => p == null))
                         return null;
+
                     return string.Join("__", objs);
 
                 };
