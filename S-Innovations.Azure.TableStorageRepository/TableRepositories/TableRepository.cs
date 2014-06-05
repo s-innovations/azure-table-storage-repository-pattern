@@ -29,7 +29,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
     public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
     {
-        private List<EntityStateWrapper<TEntity>> _cache = new List<EntityStateWrapper<TEntity>>();
+        private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
         protected readonly CloudTable table;
         protected readonly EntityTypeConfiguration configuration;
         protected readonly ITableStorageContext context;
@@ -239,7 +239,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 block.Complete();
                 await block.Completion;
             }
-            _cache = new List<EntityStateWrapper<TEntity>>();
+            _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
         }
 
@@ -264,7 +264,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         private TableOperation GetInsertionOperation<Entity>(Entity item) where Entity : ITableEntity
         {
-            Trace.TraceInformation(string.Join(", ", item.WriteEntity(null).Select(d => string.Format("{0} {1}", d.Key, d.Value.PropertyType))));
+//            Trace.TraceInformation(string.Join(", ", item.WriteEntity(null).Select(d => string.Format("{0} {1}", d.Key, d.Value.PropertyType))));
 
             TableOperation opr;
             switch (this.context.InsertionMode)
