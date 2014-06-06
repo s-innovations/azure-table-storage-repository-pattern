@@ -91,12 +91,13 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             Task.WaitAll(tasks.ToArray());
 
-         
+            //Set the properties
+            Properties = properties;
+
             //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
             config.ReverseKeyMapping(this);
 
-            //Set the properties
-            Properties = properties;
+
         }
 
         public virtual IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
