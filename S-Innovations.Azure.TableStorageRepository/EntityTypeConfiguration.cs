@@ -18,7 +18,7 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         public Func<TEntity, String> PartitionKeyMapper { get; set; }
         public Func<TEntity, String> RowKeyMapper { get; set; }
-        public Action<TEntity, string, string> ReverseKeysMapper { get; set; }
+        public Action<TEntity, IDictionary<string,EntityProperty>, string, string> ReverseKeysMapper { get; set; }
     }
     public abstract class IndexConfiguration
     {
@@ -140,7 +140,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public void ReverseKeyMapping<TEntity>(EntityAdapter<TEntity> entity)
         {
-            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.PartitionKey, entity.RowKey);
+            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject,entity.Properties, entity.PartitionKey, entity.RowKey);
         }
 
 
@@ -149,7 +149,7 @@ namespace SInnovations.Azure.TableStorageRepository
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
 
-        private static Action<TEntityType, string> EmptyReverseAction = (_, __) => { };
+        private static Action<TEntityType,IDictionary<string,EntityProperty>, string> EmptyReverseAction = (_,__, ___) => { };
         Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression;
         Func<IDictionary<string, EntityProperty>, TEntityType> CtorExpression;
         public EntityTypeConfiguration()
@@ -203,20 +203,20 @@ namespace SInnovations.Azure.TableStorageRepository
 
             Trace.TraceInformation("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
 
-            Action<TEntityType, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
-            Action<TEntityType, string> rowAction = GetReverseActionFrom<TRowKey>(RowKeyExpression);
+            Action<TEntityType,IDictionary<string,EntityProperty>, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
+            Action<TEntityType, IDictionary<string,EntityProperty>,string> rowAction = GetReverseActionFrom<TRowKey>(RowKeyExpression);
 
-            keyMapper.ReverseKeysMapper = (a, part, row) =>
+            keyMapper.ReverseKeysMapper = (a, dict, part, row) =>
             {
-                partitionAction(a, part);
-                rowAction(a, row);
+                partitionAction(a,dict, part);
+                rowAction(a,dict, row);
             };
 
             KeyMapper = keyMapper;
             return this;
         }
 
-        private Action<TEntityType, string> GetReverseActionFrom<TKey>(Expression<Func<TEntityType, TKey>> KeyExpression)
+        private Action<TEntityType,IDictionary<string,EntityProperty>, string> GetReverseActionFrom<TKey>(Expression<Func<TEntityType, TKey>> KeyExpression)
         {
 
             // When a key selector is used pointing to a property
@@ -233,35 +233,53 @@ namespace SInnovations.Azure.TableStorageRepository
 
         }
 
-        private Action<TEntityType, string> GetReverseActionFrom<TPartitionKey>(MemberExpression memberEx)
+        private Action<TEntityType,IDictionary<string,EntityProperty>, string> GetReverseActionFrom<TPartitionKey>(MemberExpression memberEx)
         {
             var property = memberEx.Member as PropertyInfo;
             if (PropertiesToEncode.Contains(property.Name))
-                return (a, partitionkey) => property.SetValue(a, StringTo(typeof(TPartitionKey), partitionkey.Base64Decode()));
-            return (a, partitionkey) => property.SetValue(a, StringTo(typeof(TPartitionKey), partitionkey));
+                return (a, dict, partitionkey) =>
+                {
+                    EntityProperty prop = null;
+                    var key = StringTo(typeof(TPartitionKey), partitionkey.Base64Decode(),out prop);
+                    if(prop!=null)
+                        dict.Add(property.Name, prop);
+                    property.SetValue(a, key);
+                };
+            return (a, dict, partitionkey) => {
+                EntityProperty prop = null;
+                var key = StringTo(typeof(TPartitionKey), partitionkey,out prop);
+                if (prop != null)
+                    dict.Add(property.Name, prop);
+                property.SetValue(a, key);
+            };
         }
 
-        private Action<TEntityType, string> GetReverseActionFrom(NewExpression newEx)
+        private Action<TEntityType,IDictionary<string,EntityProperty>,string> GetReverseActionFrom(NewExpression newEx)
         {
-            Action<TEntityType, string> partitionAction = (obj, partitionkey) =>
+            Action<TEntityType, IDictionary<string,EntityProperty>,string> partitionAction = (obj, dict,partitionkey) =>
             {
                 var parts = partitionkey.Split(new[] { "__" }, StringSplitOptions.None);
 
                 for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
                 {
-                    var prop = newEx.Members[i] as PropertyInfo;
+                    var property = newEx.Members[i] as PropertyInfo;
                     if (PropertiesToEncode.Contains(newEx.Members[i].Name))
                         parts[i] = parts[i].Base64Decode();
 
-                    prop.SetValue(obj, StringTo(prop.PropertyType, parts[i]));
+                    EntityProperty prop = null;
+
+                    property.SetValue(obj, StringTo(property.PropertyType, parts[i], out prop));
+                    if (prop != null)
+                        dict.Add(property.Name, prop);
                 }
 
             };
             return partitionAction;
         }
 
-        private object StringTo(Type type, string key)
+        private object StringTo(Type type, string key, out EntityProperty prop )
         {
+            prop = null;
             if (string.IsNullOrEmpty(key))
                 return null;
 

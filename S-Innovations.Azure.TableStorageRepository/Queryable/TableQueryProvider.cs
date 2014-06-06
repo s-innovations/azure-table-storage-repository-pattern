@@ -179,7 +179,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             //        (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
             
             //Set properties that infact are the part/row key
-            _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
+         //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
         //    }
         //        return enumerable;
                 return entity.InnerObject;
