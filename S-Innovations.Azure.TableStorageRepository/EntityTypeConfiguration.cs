@@ -268,6 +268,10 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     EntityProperty prop = null;
 
+                    if (property.SetMethod == null)
+                        throw new Exception(string.Format("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx));
+
+
                     property.SetValue(obj, StringTo(property.PropertyType, parts[i], out prop));
                     if (prop != null)
                         dict[property.Name]= prop;
