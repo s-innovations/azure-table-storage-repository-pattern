@@ -242,14 +242,14 @@ namespace SInnovations.Azure.TableStorageRepository
                     EntityProperty prop = null;
                     var key = StringTo(typeof(TPartitionKey), partitionkey.Base64Decode(),out prop);
                     if(prop!=null)
-                        dict.Add(property.Name, prop);
+                        dict[property.Name] = prop;
                     property.SetValue(a, key);
                 };
             return (a, dict, partitionkey) => {
                 EntityProperty prop = null;
                 var key = StringTo(typeof(TPartitionKey), partitionkey,out prop);
                 if (prop != null)
-                    dict.Add(property.Name, prop);
+                    dict[property.Name] = prop;
                 property.SetValue(a, key);
             };
         }
@@ -270,7 +270,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     property.SetValue(obj, StringTo(property.PropertyType, parts[i], out prop));
                     if (prop != null)
-                        dict.Add(property.Name, prop);
+                        dict[property.Name]= prop;
                 }
 
             };
