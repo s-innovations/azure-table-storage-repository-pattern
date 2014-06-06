@@ -104,6 +104,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
             
             IDictionary<string, EntityProperty>  properties = TableEntity.WriteUserObject(this.InnerObject, operationContext);
+            
             var all = Task.WhenAll(config.Properties
             .Select(async propInfo =>
                 new
@@ -122,6 +123,12 @@ namespace SInnovations.Azure.TableStorageRepository
                 if (!properties.ContainsKey(propInfo.Key))
                     properties.Add(propInfo.Key, propInfo.Value);
             }
+
+            //Remove those parts that is used for partition/row keys. (redundant data)
+            var keyprops = config.NamePairs.Keys.SelectMany(k => k.Split(new string[] { "__" }, StringSplitOptions.RemoveEmptyEntries));
+            foreach (var key in keyprops)
+                properties.Remove(key);
+
 
             return properties;
         }
