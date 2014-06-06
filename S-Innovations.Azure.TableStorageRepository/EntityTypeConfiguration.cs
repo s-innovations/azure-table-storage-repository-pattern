@@ -260,10 +260,12 @@ namespace SInnovations.Azure.TableStorageRepository
             Action<TEntityType, IDictionary<string, EntityProperty>, string> partitionAction = (obj, dict, partitionkey) =>
             {
                 var parts = partitionkey.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.None);
-
+                var type = typeof(TEntityType);
                 for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
                 {
-                    var property = newEx.Members[i] as PropertyInfo;
+                    //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
+                    PropertyInfo property = type.GetProperty(newEx.Members[i].Name);
+
                     if (PropertiesToEncode.Contains(newEx.Members[i].Name))
                         parts[i] = parts[i].Base64Decode();
 
@@ -272,7 +274,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
                     if (property.SetMethod == null)
-                        Trace.TraceWarning("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx);
+                    {}//     Trace.TraceWarning("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx);
                     else
                         Trace.TraceWarning("SetMethod was not null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx);
         
