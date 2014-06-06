@@ -129,7 +129,7 @@ namespace SInnovations.Azure.TableStorageRepository
             }
 
             //Remove those parts that is used for partition/row keys. (redundant data)
-            var keyprops = config.NamePairs.Keys.SelectMany(k => k.Split(new string[] { "__" }, StringSplitOptions.RemoveEmptyEntries));
+            var keyprops = config.NamePairs.Keys.SelectMany(k => k.Split(new string[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries));
             foreach (var key in keyprops)
                 properties.Remove(key);
 

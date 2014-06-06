@@ -79,6 +79,7 @@ namespace SInnovations.Azure.TableStorageRepository
                         && EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder)))
                     {
                         builder = new TableStorageModelBuilder();
+
                         OnModelCreating(builder);
                         EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
                     }
@@ -195,6 +196,12 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             get;
             set;
+        }
+        private static string sep = null;
+        public static string KeySeparator
+        {
+            get { return sep ?? "__"; }
+            set { sep = value; }
         }
     }
 }

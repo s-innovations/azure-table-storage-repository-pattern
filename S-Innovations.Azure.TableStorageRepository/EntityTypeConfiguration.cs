@@ -258,7 +258,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             Action<TEntityType, IDictionary<string,EntityProperty>,string> partitionAction = (obj, dict,partitionkey) =>
             {
-                var parts = partitionkey.Split(new[] { "__" }, StringSplitOptions.None);
+                var parts = partitionkey.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.None);
 
                 for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
                 {
@@ -305,8 +305,8 @@ namespace SInnovations.Azure.TableStorageRepository
                 TableName = TableName,
                 GetIndexKeyFunc = (objs) =>
                 {
-                    var propNames = key.Split(new[] { "__" }, StringSplitOptions.RemoveEmptyEntries);
-                    var idxKey = string.Join("__", objs.Select((obj, idx) => ConvertToString(obj, PropertiesToEncode.Contains(propNames[idx]))));
+                    var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(obj, PropertiesToEncode.Contains(propNames[idx]))));
                     return idxKey;
                 }
             });
@@ -464,7 +464,7 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 Trace.TraceInformation("Using NewExpressino for KeyMapping");
                 var newEx = expression.Body as NewExpression;
-                key = string.Join("__", newEx.Members.Select(m => m.Name));
+                key = string.Join(TableStorageContext.KeySeparator, newEx.Members.Select(m => m.Name));
              
                 return (o) =>
                 {
@@ -479,8 +479,8 @@ namespace SInnovations.Azure.TableStorageRepository
                     //If any nulls, then the key becomes a enmpty string.
                  //   if (objs.Any(p => p == null))
                  //       return "";
-                    
-                    return string.Join("__", objs.Select(t=>t==null?"":t));
+
+                    return string.Join(TableStorageContext.KeySeparator, objs.Select(t => t == null ? "" : t));
 
                 };
             }
