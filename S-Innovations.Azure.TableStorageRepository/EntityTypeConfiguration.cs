@@ -284,13 +284,13 @@ namespace SInnovations.Azure.TableStorageRepository
                 return null;
 
             if (type == typeof(string))
-                return key;
+            { prop = new EntityProperty((string)key); return key; }
             else if (type == typeof(int))
-                return int.Parse(key);
+            { int value = int.Parse(key); prop = new EntityProperty(value); return value; }
             else if (type == typeof(long))
-                return long.Parse(key);
+            { long value = long.Parse(key); prop = new EntityProperty(value); return value; }
             else if (type == typeof(Guid))
-                return Guid.Parse(key);
+            { Guid value = Guid.Parse(key); prop = new EntityProperty(value); return value; }
 
             throw new Exception("not supported type");
         }
