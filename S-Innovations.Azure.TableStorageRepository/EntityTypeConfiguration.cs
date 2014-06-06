@@ -274,10 +274,9 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
                     if (property.SetMethod == null)
-                    {}//     Trace.TraceWarning("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx);
-                    else
-                        Trace.TraceWarning("SetMethod was not null: {1} {0} {{get;set;}}\n {2} \n {3}", property.Name, property.PropertyType, partitionkey, newEx);
-        
+                        throw new Exception(string.Format("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}\n\n When using Composite Keys, do m => new {m.PropertyName0,m.PropertyName1}, and only int,long,guid,string properties are supported at this point.", property.Name, property.PropertyType, partitionkey, newEx));
+
+                  
                     if (property.SetMethod != null)
                         property.SetValue(obj, value);
 
