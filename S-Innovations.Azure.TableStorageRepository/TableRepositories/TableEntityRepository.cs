@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
-    [Obsolete]
+    [Obsolete("Dont use this, there is fine support for ITableEntity build in")]
     public class TableEntityRepository<TEntity> :
            TableRepository<TEntity>,
            ITableRepository<TEntity>
@@ -121,6 +121,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         public CloudTable Table
         {
             get { return table; }
+        }
+
+
+        public void Update(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -30,6 +30,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         void Add(TEntity entity, IDictionary<string, EntityProperty> additionalProperties);
         void Delete(TEntity entity);
         void Update(TEntity entity);
+        void Update(TEntity entity, IDictionary<string, EntityProperty> additionalProperties);
 
         IQueryable<TEntity> BaseQuery { get; set; }
 

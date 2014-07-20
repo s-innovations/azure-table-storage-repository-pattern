@@ -201,6 +201,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 base.Delete(new EntityAdapter<TEntity>(configuration,entity, null, "*"));
 
         }
+        public void Update(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
+        {
+            Tuple<DateTimeOffset, string> _state;
+            if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
+                base.Update(new EntityAdapter<TEntity>(configuration, entity, _state.Item1, _state.Item2) { Properties = additionalProperties });
+            else
+                base.Update(new EntityAdapter<TEntity>(configuration, entity, null, "*") { Properties = additionalProperties });
+        }
         public void Update(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
@@ -322,6 +330,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
              
         }
+
+
+
 
 
 
