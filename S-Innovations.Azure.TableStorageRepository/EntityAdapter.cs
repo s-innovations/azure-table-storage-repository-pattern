@@ -16,12 +16,12 @@ namespace SInnovations.Azure.TableStorageRepository
         [IgnoreProperty]
         public IndexConfiguration Config { get; set; }
     }
-    internal interface IEntityAdapter
+    public interface IEntityAdapter
     {
         object GetInnerObject();
         IDictionary<string, EntityProperty> Properties { get; }
     }
-    internal interface IEntityAdapter<T> : IEntityAdapter
+    public interface IEntityAdapter<T> : IEntityAdapter
     {
         T InnerObject { get; }
     }
