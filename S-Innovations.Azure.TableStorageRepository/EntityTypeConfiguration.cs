@@ -517,11 +517,26 @@ namespace SInnovations.Azure.TableStorageRepository
             return type.IsPrimitive || type == typeof(string) || type == typeof(Guid);
         }
 
-
-
-
-
+        Func<string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer;
+        
+        internal Task<SizeReductionResult> SizeReducerAsync(string key, EntityProperty value, IDictionary<string, EntityProperty> properties)
+        {
+            if (reducer == null)
+            {
+                Trace.TraceWarning("SizeReducer was called for {0} but no reducer was set.", key);
+                return Task.FromResult(new SizeReductionResult { Key = key, Value = value });
+            }
+            return reducer(key, value, properties);
+        }
+        public void SetColumnSizeReducer(Func<string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer)
+        {
+            this.reducer = reducer;
+        }
     }
-
+    public class SizeReductionResult
+    {
+        public string Key { get; set; }
+        public EntityProperty Value { get; set; }
+    }
 
 }

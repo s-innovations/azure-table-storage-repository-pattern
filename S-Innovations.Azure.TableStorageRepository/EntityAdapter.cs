@@ -135,7 +135,33 @@ namespace SInnovations.Azure.TableStorageRepository
                 properties.Remove(key);
 
 
+            EnsureSizeLimites(properties);
+
             return properties;
+        }
+
+        private void EnsureSizeLimites(IDictionary<string, EntityProperty> properties)
+        {
+            //Now Ensure Sizes
+            List<Task<SizeReductionResult>> tasks = new List<Task<SizeReductionResult>>();
+            foreach (var key in properties.Keys)
+            {
+                var value = properties[key];
+                if (value.PropertyType == EdmType.Binary)
+                {
+                    if (value.BinaryValue.Length > 64000)
+                    {
+
+                        tasks.Add(config.SizeReducerAsync(key, value, properties));
+                    }
+                }
+            }
+
+            Task.WaitAll(tasks.ToArray());
+            foreach (var task in tasks.Select(t => t.Result))
+            {
+                properties[task.Key] = task.Value;
+            }
         }
 
         public virtual IDictionary<string, EntityProperty> Properties { get; set; }
