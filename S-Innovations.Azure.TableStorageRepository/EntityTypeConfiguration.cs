@@ -187,15 +187,16 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
-            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, int?fixedLength = null)
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params int[] keylenghts)
         {
             string partitionKey = "";
             string rowKey = "";
+            var lengthQueue = new Queue<int>(keylenghts);
 
             var keyMapper = new KeysMapper<TEntityType>
             {
-                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, PropertiesToEncode.ToArray(), fixedLength),
-                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey, PropertiesToEncode.ToArray(), fixedLength)
+                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, PropertiesToEncode.ToArray(), lengthQueue),
+                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey, PropertiesToEncode.ToArray(), lengthQueue)
             };
             if (!string.IsNullOrEmpty(partitionKey))
                 this.NamePairs.Add(partitionKey, "PartitionKey");
@@ -462,7 +463,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, int? fixedLenght=null)
+        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int> lenghts=null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -470,7 +471,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 var memberEx = expression.Body as MemberExpression;
                 var propertyName = memberEx.Member.Name;
                 key = propertyName;
-                return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), fixedLenght);
+                return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), lenghts == null || lenghts.Count == 0 ? (int?)null : lenghts.Dequeue());
             }
             else if (expression.Body is NewExpression)
             {
@@ -486,7 +487,8 @@ namespace SInnovations.Azure.TableStorageRepository
                     var obj = func(o);
 
                     var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
-                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name),fixedLenght));
+
+                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name), lenghts == null|| lenghts.Count==0 ? (int?)null : lenghts.Dequeue()));
 
                     //If any nulls, then the key becomes a enmpty string.
                     //   if (objs.Any(p => p == null))
