@@ -509,10 +509,13 @@ namespace SInnovations.Azure.TableStorageRepository
             if (obj == null)
                 return null;
            
-
-            if (obj.GetType() == typeof(int) && fixedLength.HasValue)
+            if(fixedLength.HasValue){
+            if (obj.GetType() == typeof(int))
                 return ((int)obj).ToString("D" + fixedLength.Value);
+            if (obj.GetType() == typeof(string))
+                return ((string)obj).PadLeft(fixedLength.Value, TableStorageContext.KeySeparator.First());
            
+            }
             var str = obj.ToString();
             if (encode)
                 return str.Base64Encode();
