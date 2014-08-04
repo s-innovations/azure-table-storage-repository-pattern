@@ -30,7 +30,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
     public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
     {
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
-        protected readonly CloudTable table;
+
+      
+
+        protected CloudTable table;
         protected readonly EntityTypeConfiguration configuration;
         protected readonly ITableStorageContext context;
 

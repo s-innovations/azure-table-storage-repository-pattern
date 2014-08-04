@@ -116,12 +116,9 @@ namespace SInnovations.Azure.TableStorageRepository
             throw new NotImplementedException();
         }
 
-        public Task SaveChangesAsync()
+        public virtual Task SaveChangesAsync()
         {
-           // foreach (var rep in repositories)
-           // {
-           //     await rep.SaveChangesAsync();
-           // }
+
            return Task.WhenAll(repositories.Select(rep => rep.SaveChangesAsync()));
         }
 

@@ -113,6 +113,7 @@ namespace SInnovations.Azure.TableStorageRepository
         // protected readonly TableStorageModelBuilder builder;
         public ConcurrentDictionary<long, Tuple<DateTimeOffset, string>> EntityStates { get; set; }
 
+        
         public EntityTypeConfiguration()
         {
             // this.builder = builder;
@@ -528,9 +529,10 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             return reducer(key, value, properties);
         }
-        public void SetColumnSizeReducer(Func<string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer)
+        public EntityTypeConfiguration<TEntityType> SetColumnSizeReducer(Func<string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer)
         {
             this.reducer = reducer;
+            return this;
         }
     }
     public class SizeReductionResult

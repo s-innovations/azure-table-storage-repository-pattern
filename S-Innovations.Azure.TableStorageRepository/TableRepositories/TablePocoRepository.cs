@@ -38,6 +38,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             get { return table; }
         }
+
         //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
         {
