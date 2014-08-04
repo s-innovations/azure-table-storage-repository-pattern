@@ -160,10 +160,16 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public CloudTable GetTable(string name)
         {
+          
             var tbl= _client.Value.GetTableReference(name);
-            tbl.CreateIfNotExists();
+        
+            //if (createIfNotExists)
+            //{
+            //    tbl.CreateIfNotExists();
+            //}
             return tbl;
         }
+
 
         public CloudTable GetTable<T1>()
         {
