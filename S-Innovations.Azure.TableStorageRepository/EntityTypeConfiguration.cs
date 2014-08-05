@@ -113,7 +113,7 @@ namespace SInnovations.Azure.TableStorageRepository
         // protected readonly TableStorageModelBuilder builder;
         public ConcurrentDictionary<long, Tuple<DateTimeOffset, string>> EntityStates { get; set; }
 
-        
+
         public EntityTypeConfiguration()
         {
             // this.builder = builder;
@@ -278,7 +278,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     if (property.SetMethod == null)
                         throw new Exception(string.Format("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}\n\n When using Composite Keys, do m => new {m.PropertyName0,m.PropertyName1}, and only int,long,guid,string properties are supported at this point.", property.Name, property.PropertyType, partitionkey, newEx));
 
-                  
+
                     if (property.SetMethod != null)
                         property.SetValue(obj, value);
 
@@ -295,7 +295,7 @@ namespace SInnovations.Azure.TableStorageRepository
             prop = null;
             if (string.IsNullOrEmpty(key))
                 return null;
-
+           
             if (type == typeof(string))
             { prop = new EntityProperty((string)key); return key; }
             else if (type == typeof(int))
@@ -463,7 +463,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int> lenghts=null)
+        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int> lenghts = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -471,13 +471,19 @@ namespace SInnovations.Azure.TableStorageRepository
                 var memberEx = expression.Body as MemberExpression;
                 var propertyName = memberEx.Member.Name;
                 key = propertyName;
-                return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), lenghts == null || lenghts.Count == 0 ? (int?)null : lenghts.Dequeue());
+                var length = (lenghts == null || lenghts.Count == 0) ? (int?)null : lenghts.Dequeue();
+                return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), length);
             }
             else if (expression.Body is NewExpression)
             {
                 Trace.WriteLine("Using NewExpressino for KeyMapping");
                 var newEx = expression.Body as NewExpression;
                 key = string.Join(TableStorageContext.KeySeparator, newEx.Members.Select(m => m.Name));
+                var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
+                List<int?> lenghtsList = new List<int?>();
+                int mi = properties.Length;
+                while (mi-- > 0)
+                   lenghtsList.Add(lenghts == null || lenghts.Count == 0 ? (int?)null : lenghts.Dequeue());
 
                 return (o) =>
                 {
@@ -486,9 +492,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     var obj = func(o);
 
-                    var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
-
-                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name), lenghts == null|| lenghts.Count==0 ? (int?)null : lenghts.Dequeue()));
+                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name), lenghtsList[i])
+                    );
 
                     //If any nulls, then the key becomes a enmpty string.
                     //   if (objs.Any(p => p == null))
@@ -506,17 +511,18 @@ namespace SInnovations.Azure.TableStorageRepository
             return (a) => "";
 
         }
-        private static string ConvertToString(object obj, bool encode,int?fixedLength=null)
+        private static string ConvertToString(object obj, bool encode, int? fixedLength = null)
         {
             if (obj == null)
                 return null;
-           
-            if(fixedLength.HasValue){
-            if (obj.GetType() == typeof(int))
-                return ((int)obj).ToString("D" + fixedLength.Value);
-            if (obj.GetType() == typeof(string))
-                return ((string)obj).PadLeft(fixedLength.Value, TableStorageContext.KeySeparator.First());
-           
+
+            if (fixedLength.HasValue)
+            {
+                if (obj.GetType() == typeof(int))
+                    return ((int)obj).ToString("D" + fixedLength.Value);
+                if (obj.GetType() == typeof(string))
+                    return ((string)obj).PadLeft(fixedLength.Value, TableStorageContext.KeySeparator.First());
+
             }
             var str = obj.ToString();
             if (encode)
@@ -529,7 +535,7 @@ namespace SInnovations.Azure.TableStorageRepository
         }
 
         Func<string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer;
-        
+
         internal Task<SizeReductionResult> SizeReducerAsync(string key, EntityProperty value, IDictionary<string, EntityProperty> properties)
         {
             if (reducer == null)

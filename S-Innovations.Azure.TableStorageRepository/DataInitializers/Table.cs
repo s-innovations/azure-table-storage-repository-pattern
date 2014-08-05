@@ -8,10 +8,14 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
 {
     public class CreateTablesIfNotExists<TableContext> : Initializer<TableContext> where TableContext : ITableStorageContext
     {
-
+        private Type[] ignored;
+        public CreateTablesIfNotExists(params Type[] ignored)
+        {
+            this.ignored = ignored;
+        }
         public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
         {
-            foreach (var table in modelbuilder.entities)
+            foreach (var table in modelbuilder.entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
                 context.GetTable(EntityTypeConfigurationsContainer.Configurations[table].TableName).CreateIfNotExists();
             }
