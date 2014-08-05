@@ -187,11 +187,11 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
-            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params int[] keylenghts)
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params int?[] keylenghts)
         {
             string partitionKey = "";
             string rowKey = "";
-            var lengthQueue = new Queue<int>(keylenghts);
+            var lengthQueue = new Queue<int?>(keylenghts);
 
             var keyMapper = new KeysMapper<TEntityType>
             {
@@ -463,7 +463,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int> lenghts = null)
+        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int?> lenghts = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
