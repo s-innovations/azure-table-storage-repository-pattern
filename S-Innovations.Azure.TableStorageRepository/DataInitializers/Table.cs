@@ -15,9 +15,14 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
         }
         public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
         {
+           
             foreach (var table in modelbuilder.entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
-                context.GetTable(EntityTypeConfigurationsContainer.Configurations[table].TableName).CreateIfNotExists();
+                var config = EntityTypeConfigurationsContainer.Configurations[table];
+                context.GetTable(config.TableName).CreateIfNotExists();
+                var tasks = config.Indexes.Select(index => context.GetTable(index.Value.TableName).CreateIfNotExistsAsync()).ToArray();
+                Task.WaitAll(tasks);
+                    
             }
 
         }
