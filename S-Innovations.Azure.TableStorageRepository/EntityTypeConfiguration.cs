@@ -315,7 +315,7 @@ namespace SInnovations.Azure.TableStorageRepository
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
                 Finder = entityToKeyProperty,
-                TableName = TableName,
+                TableName = TableName ?? (string.IsNullOrWhiteSpace(this.TableName)? null : this.TableName+ "Index"),
                 GetIndexKeyFunc = (objs) =>
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
@@ -460,6 +460,9 @@ namespace SInnovations.Azure.TableStorageRepository
         public EntityTypeConfiguration<TEntityType> ToTable(string tableName)
         {
             this.TableName = tableName;
+            foreach (var index in Indexes.Where(i => string.IsNullOrWhiteSpace(i.Value.TableName)))
+                index.Value.TableName = this.TableName + "Index";
+
             return this;
         }
 
