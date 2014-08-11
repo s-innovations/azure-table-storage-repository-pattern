@@ -153,7 +153,7 @@ namespace SInnovations.Azure.TableStorageRepository
     }
     public struct LengthPadding
     {
-        public int Lenght { get; set; }
+        public int Length { get; set; }
         public PaddingDirection Direction { get; set; }
     }
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
@@ -534,9 +534,9 @@ namespace SInnovations.Azure.TableStorageRepository
                //     return ((int)obj).ToString("D" + fixedLength.Value.Lenght);
                // if (obj.GetType() == typeof(string))
                 if(fixedLength.Value.Direction == PaddingDirection.Left)
-                    return (obj.ToString()).PadLeft(fixedLength.Value.Lenght, TableStorageContext.KeySeparator.First());
+                    return (obj.ToString()).PadLeft(fixedLength.Value.Length, TableStorageContext.KeySeparator.First());
                 else
-                    return (obj.ToString()).PadRight(fixedLength.Value.Lenght, TableStorageContext.KeySeparator.First());
+                    return (obj.ToString()).PadRight(fixedLength.Value.Length, TableStorageContext.KeySeparator.First());
 
             }
             var str = obj.ToString();
