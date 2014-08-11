@@ -146,7 +146,16 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
     }
-
+    public enum PaddingDirection
+    {
+        Left,
+        Right,
+    }
+    public struct LengthPadding
+    {
+        public int Lenght { get; set; }
+        public PaddingDirection Direction { get; set; }
+    }
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
 
@@ -187,11 +196,11 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
-            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params int?[] keylenghts)
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params LengthPadding?[] keylenghts)
         {
             string partitionKey = "";
             string rowKey = "";
-            var lengthQueue = new Queue<int?>(keylenghts);
+            var lengthQueue = new Queue<LengthPadding?>(keylenghts);
 
             var keyMapper = new KeysMapper<TEntityType>
             {
@@ -466,7 +475,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<int?> lenghts = null)
+        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<LengthPadding?> lenghts = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -474,7 +483,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 var memberEx = expression.Body as MemberExpression;
                 var propertyName = memberEx.Member.Name;
                 key = propertyName;
-                var length = (lenghts == null || lenghts.Count == 0) ? (int?)null : lenghts.Dequeue();
+                var length = (lenghts == null || lenghts.Count == 0) ? (LengthPadding?)null : lenghts.Dequeue();
                 return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), length);
             }
             else if (expression.Body is NewExpression)
@@ -483,10 +492,10 @@ namespace SInnovations.Azure.TableStorageRepository
                 var newEx = expression.Body as NewExpression;
                 key = string.Join(TableStorageContext.KeySeparator, newEx.Members.Select(m => m.Name));
                 var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
-                List<int?> lenghtsList = new List<int?>();
+                List<LengthPadding?> lenghtsList = new List<LengthPadding?>();
                 int mi = properties.Length;
                 while (mi-- > 0)
-                   lenghtsList.Add(lenghts == null || lenghts.Count == 0 ? (int?)null : lenghts.Dequeue());
+                    lenghtsList.Add(lenghts == null || lenghts.Count == 0 ? (LengthPadding?)null : lenghts.Dequeue());
 
                 return (o) =>
                 {
@@ -514,17 +523,20 @@ namespace SInnovations.Azure.TableStorageRepository
             return (a) => "";
 
         }
-        private static string ConvertToString(object obj, bool encode, int? fixedLength = null)
+        private static string ConvertToString(object obj, bool encode, LengthPadding? fixedLength = null)
         {
             if (obj == null)
                 return null;
 
             if (fixedLength.HasValue)
             {
-                if (obj.GetType() == typeof(int))
-                    return ((int)obj).ToString("D" + fixedLength.Value);
-                if (obj.GetType() == typeof(string))
-                    return ((string)obj).PadLeft(fixedLength.Value, TableStorageContext.KeySeparator.First());
+               // if (obj.GetType() == typeof(int))
+               //     return ((int)obj).ToString("D" + fixedLength.Value.Lenght);
+               // if (obj.GetType() == typeof(string))
+                if(fixedLength.Value.Direction == PaddingDirection.Left)
+                    return (obj.ToString()).PadLeft(fixedLength.Value.Lenght, TableStorageContext.KeySeparator.First());
+                else
+                    return (obj.ToString()).PadRight(fixedLength.Value.Lenght, TableStorageContext.KeySeparator.First());
 
             }
             var str = obj.ToString();
