@@ -60,7 +60,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
             this.InsertionMode = InsertionMode.AddOrMerge;
         }
-        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder)
+        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)
         {
             modelbuilder.Entity<Person>().HasKeys((c) => c.FamilyName, c => c.FirstName)
                 .WithIndex(p=>p.FirstName)

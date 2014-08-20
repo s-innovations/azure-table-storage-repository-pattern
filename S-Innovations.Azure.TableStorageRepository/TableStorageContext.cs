@@ -53,7 +53,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public bool AutoSaveOnDispose { get; set; }
         private static object _lock = new object();
-        public TableStorageContext(CloudStorageAccount storage)
+        public TableStorageContext(CloudStorageAccount storage, params object[] modelBuilderParams)
         {
             _storage = storage;
             _client = new Lazy<CloudTableClient>(CreateClient);
@@ -80,7 +80,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     {
                         builder = new TableStorageModelBuilder();
 
-                        OnModelCreating(builder);
+                        OnModelCreating(builder, modelBuilderParams);
                         EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
                     }
                 }
@@ -123,7 +123,7 @@ namespace SInnovations.Azure.TableStorageRepository
         }
 
 
-        protected virtual void OnModelCreating(TableStorageModelBuilder modelbuilder)
+        protected virtual void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)
         {
 
         }
