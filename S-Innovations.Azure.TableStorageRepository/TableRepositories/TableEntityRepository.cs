@@ -128,5 +128,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             throw new NotImplementedException();
         }
+
+
+        public Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey, params string[] properties)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

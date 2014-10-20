@@ -45,5 +45,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             get;
         }
         Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey);
+
+        Task<IDictionary<string, EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey, params string[] properties);
+
     }
 }

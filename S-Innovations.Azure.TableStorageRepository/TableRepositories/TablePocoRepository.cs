@@ -251,6 +251,22 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return result.Properties;
         }
 
+        public async Task<IDictionary<string,EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey, params string[] properties)
+        {
+            var tableQuery = new TableQuery<EntityAdapter<TEntity>>();
+            tableQuery.SelectColumns = new List<string>(properties);
+            tableQuery.FilterString = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey);
+            tableQuery.FilterString = TableQuery.CombineFilters(tableQuery.FilterString, TableOperators.And,
+            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
+
+            var entity = await table.ExecuteQueryAsync(tableQuery);
+            if (!entity.Any())
+                return new Dictionary<string,EntityProperty>();
+
+            return entity.First().Properties;
+
+        }
+
         public bool Contains(TEntity item)
         {
             return ((ICollection<EntityAdapter<TEntity>>)this).Any(t => t.InnerObject.Equals(item));
