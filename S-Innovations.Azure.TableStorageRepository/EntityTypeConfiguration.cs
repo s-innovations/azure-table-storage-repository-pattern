@@ -199,6 +199,13 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
+      
+        public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey>(
+             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
+             params LengthPadding?[] keylenghts)
+        {
+            return HasKeys(PartitionKeyExpression, keylenghts);
+        }
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
             Expression<Func<TEntityType, TRowKey>> RowKeyExpression = null, params LengthPadding?[] keylenghts)
