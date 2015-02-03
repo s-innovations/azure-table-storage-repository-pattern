@@ -204,11 +204,11 @@ namespace SInnovations.Azure.TableStorageRepository
              Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
              params LengthPadding?[] keylenghts)
         {
-            return HasKeys(PartitionKeyExpression, keylenghts);
+            return HasKeys<TPartitionKey,String>(PartitionKeyExpression, null,keylenghts);
         }
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
-            Expression<Func<TEntityType, TRowKey>> RowKeyExpression = null, params LengthPadding?[] keylenghts)
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params LengthPadding?[] keylenghts)
         {
             string partitionKey = "";
             string rowKey = "";
