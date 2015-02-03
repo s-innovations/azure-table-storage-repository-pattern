@@ -201,7 +201,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
-            Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params LengthPadding?[] keylenghts)
+            Expression<Func<TEntityType, TRowKey>> RowKeyExpression = null, params LengthPadding?[] keylenghts)
         {
             string partitionKey = "";
             string rowKey = "";
@@ -210,7 +210,7 @@ namespace SInnovations.Azure.TableStorageRepository
             var keyMapper = new KeysMapper<TEntityType>
             {
                 PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, lengthQueue),
-                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey, lengthQueue)
+                RowKeyMapper = RowKeyExpression==null? (e) => "" : ConvertToStringKey(RowKeyExpression, out rowKey, lengthQueue)
             };
             if (!string.IsNullOrEmpty(partitionKey))
                 this.NamePairs.Add(partitionKey, "PartitionKey");
@@ -220,7 +220,7 @@ namespace SInnovations.Azure.TableStorageRepository
             Trace.TraceInformation("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
 
             Action<TEntityType, IDictionary<string, EntityProperty>, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
-            Action<TEntityType, IDictionary<string, EntityProperty>, string> rowAction = GetReverseActionFrom<TRowKey>(RowKeyExpression);
+            Action<TEntityType, IDictionary<string, EntityProperty>, string> rowAction = RowKeyExpression==null?(e,d,s)=>{}: GetReverseActionFrom<TRowKey>(RowKeyExpression);
 
             keyMapper.ReverseKeysMapper = (a, dict, part, row) =>
             {
