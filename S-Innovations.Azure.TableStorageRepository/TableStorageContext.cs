@@ -114,8 +114,13 @@ namespace SInnovations.Azure.TableStorageRepository
             //}
 
 
-            BuildModel(builder);
+            //How long time does it take.
+            using (new TraceTimer("Using reflection to set propeties.") { TraceLevel = System.Diagnostics.TraceLevel.Verbose, Threshold = 0 })
+            {
+                BuildModel(builder);
 
+            }
+          
           
            
 
