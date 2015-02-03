@@ -18,20 +18,34 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
     /// </summary>
     internal sealed class ExpressionTranslator : ExpressionVisitor
     {
+        private struct KeyFilter
+        {
+            public String Type { get; set; }
+            public int Position { get; set; }
+            public String Value { get; set; }
+
+            public string PropertyName { get; set; }
+        }
         static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
 
         private readonly ExpressionEvaluator _constantEvaluator;
         private readonly IDictionary<string, string> _nameChanges;
+        EntityTypeConfiguration _configuration;
         private StringBuilder _filter;
+        private List<KeyFilter> _keyFilters;
+
         private ITranslationResult _result;
 
         /// <summary>
         ///     Constructor.
         /// </summary>
         /// <param name="nameChanges"></param>
-        internal ExpressionTranslator(IDictionary<string, string> nameChanges)
+        internal ExpressionTranslator(EntityTypeConfiguration configuration)
         {
-            _nameChanges = nameChanges;
+            //_nameChanges = nameChanges;
+            _configuration = configuration;
+            _nameChanges = configuration.NamePairs;
+
             _constantEvaluator = new ExpressionEvaluator();
         }
 
@@ -52,10 +66,80 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
 
             _filter = new StringBuilder();
+            _keyFilters = new List<KeyFilter>();
+
 
             Visit(lambda.Body);
-           
-            _result.AddFilter(TrimString(_filter));
+
+            var odataFilter = TrimString(_filter);
+
+            if (_keyFilters.Any())
+            {
+
+
+                var filter = new StringBuilder();
+
+                var keys = _keyFilters.GroupBy(k => k.Type)
+                    .Select(k => new
+                    {
+                        k.Key,
+                        PropertyName = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.PropertyName)),
+                        StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value))
+                    }).ToArray();
+
+                for (int i = 0; i < keys.Length; ++i)
+                {
+
+                    var key = keys[i];
+                    if (!_nameChanges.Keys.Any(k => k.StartsWith(key.PropertyName)))
+                        throw new Exception("Make sure that all the filters are used when having hasKeys(p=new { p.p1, p.p2}) ");
+
+                    if (i > 0)
+                        filter.Append(" and ");
+
+
+                    var length = key.StartsWithPattern.Length - 1;
+                    var lastChar = key.StartsWithPattern[length];
+                    var nextLastChar = (char)(lastChar + 1);
+                    var startsWithEndPattern = key.StartsWithPattern.Substring(0, length) + nextLastChar;
+
+
+                    filter.Append(key.Key);
+                    filter.Append(" ge '");
+                    filter.Append(key.StartsWithPattern);
+                    filter.Append("' and ");
+                    filter.Append(key.Key);
+                    filter.Append(" lt '");
+                    filter.Append(startsWithEndPattern);
+                    filter.Append("'");
+
+
+                }
+
+                //var i = 0;
+                //if (odataFilter.StartsWith(" and "))
+                //    i = " and ".Length;
+                //if (odataFilter.StartsWith("( and )"))
+                //    i = "( and )".Length;
+
+                //   "(( and ) and ) and"
+                int idx = 0;
+                do
+                {
+                    idx = odataFilter.IndexOf("( and )");
+                    if (idx > -1)
+                    {
+                        odataFilter = odataFilter.Remove(idx, "( and )".Length);
+                    }
+
+                } while (idx > -1);
+                if (odataFilter.Equals(" and "))
+                    odataFilter = "";
+
+                odataFilter = filter.ToString() + odataFilter;
+            }
+
+            _result.AddFilter(odataFilter);
         }
 
         public void AddPostProcessing(MethodCallExpression method)
@@ -85,6 +169,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 i++;
             }
 
+
+
             while (j > i && builder[j] == ' ')
             {
                 j--;
@@ -96,6 +182,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 i++;
                 j--;
             }
+
 
             return builder.ToString(i, j - i + 1);
         }
@@ -127,13 +214,18 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
             bool paranthesesRequired = nodeType.IsSupported() && (leftType.IsSupported() || rightType.IsSupported());
 
+            if (IsPartionOrRowKeyNameChange(binary))
+            {
+                return binary;
+            }
+
             if (paranthesesRequired)
             {
                 _filter.Append("(");
             }
 
             //If its part of partition or rowkey
-           
+
 
             // Left part
             if (leftType == ExpressionType.Call)
@@ -142,9 +234,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 {
                     return binary;
                 }
-            }else if (IsPartionOrRowKeyNameChange(binary))
-            {
-                return binary;
+                Logger.WarnFormat("Please report this if you see it in your logs, ID:F68BA48F-DA61-4DEB-A078-5D10F722E324");
             }
             else
             {
@@ -155,6 +245,18 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             _filter.AppendFormat(" {0} ", nodeType.Serialize());
 
             // Right part
+            AppendRightPart(binary, nodeType, rightType);
+
+            if (paranthesesRequired)
+            {
+                _filter.Append(")");
+            }
+
+            return binary;
+        }
+
+        private void AppendRightPart(BinaryExpression binary, ExpressionType nodeType, ExpressionType rightType)
+        {
             if (rightType == ExpressionType.Call)
             {
                 var methodCall = (MethodCallExpression)binary.Right;
@@ -169,57 +271,69 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             {
                 AppendBinaryPart(binary.Right, rightType);
             }
-
-            if (paranthesesRequired)
-            {
-                _filter.Append(")");
-            }
-
-            return binary;
         }
+        int i = 0;
 
+        private bool Is(MemberExpression member, out string key, out string[] keys)
+        {
+            key = null; keys = null;
+            foreach (var properties in _nameChanges.Keys)
+            {
+                key = properties;
+
+                keys = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                if (keys.Skip(1).Any())
+                {
+
+                    if (keys.Any(k => k == member.Member.Name))
+                    {
+
+
+                        return true;
+                    }
+
+                }
+
+            }
+            return false;
+
+        }
         private bool IsPartionOrRowKeyNameChange(BinaryExpression binary)
         {
+            i++;
             var left = binary.Left;
+
             if (left.NodeType == ExpressionType.MemberAccess)
             {
                 var member = (MemberExpression)binary.Left;
-                foreach (var key in _nameChanges.Keys)
+                string key;
+                string[] keys;
+                if (Is(member, out key, out keys))
                 {
+                    var old = _filter;
+                    var startsWithPattern = "";
+                    _filter = new StringBuilder();
+                    AppendRightPart(binary, binary.NodeType, binary.Right.NodeType);
+                    // AppendBinaryPart(binary.Right, binary.Right.NodeType);
+                    startsWithPattern = _filter.ToString().Trim('\'');
+                    _filter = old;
 
-                    var keys = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
-                    if (keys.Skip(1).Any())
+                    
+                     
+
+                    _keyFilters.Add(new KeyFilter
                     {
-                        if (keys.Contains(member.Member.Name))
-                        {
-                            var old = _filter;
-                            var startsWithPattern = "";
-                            _filter = new StringBuilder();
-                            AppendBinaryPart(binary.Right, binary.Right.NodeType);
-                            startsWithPattern = _filter.ToString().Trim('\'');
-                            _filter = old;
+                        PropertyName = member.Member.Name,
+                        Type = _nameChanges[key],
+                        Value = _configuration.PropertiesToEncode.ContainsKey(member.Member.Name) ?
+                            _configuration.PropertiesToEncode[member.Member.Name].Encoder(startsWithPattern) :
+                            startsWithPattern,
+                        Position = Array.IndexOf(keys, member.Member.Name),
+                    });
 
-
-                            var length = startsWithPattern.Length - 1;
-                            var lastChar = startsWithPattern[length];
-                            var nextLastChar = (char)(lastChar + 1);
-                            var startsWithEndPattern = startsWithPattern.Substring(0, length) + nextLastChar;
-
-                            _filter.Append(_nameChanges[key]);
-                            _filter.Append(" ge '");
-                            _filter.Append(startsWithPattern);
-                            _filter.Append("' and ");
-                            _filter.Append(_nameChanges[key]);
-                            _filter.Append(" lt '");
-                            _filter.Append(startsWithEndPattern);
-                            _filter.Append("'");
-
-                            return true;
-                        }
-                    }
-
-                    return false;
+                    return true;
                 }
+
 
             }
             return false;
@@ -278,6 +392,48 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         {
             switch (node.Method.Name)
             {
+                case "StartsWith":
+
+                    var member = (MemberExpression)node.Object;
+                    var propName = member.Member.Name;
+
+                    var instance = _constantEvaluator.Evaluate(node.Arguments[0]) as ConstantExpression;
+                    var startsWithPattern = instance.Value as string;
+                    if (_configuration.PropertiesToEncode.ContainsKey(propName))
+                        startsWithPattern = _configuration.PropertiesToEncode[propName].Encoder(startsWithPattern);
+
+                    var length = startsWithPattern.Length - 1;
+                    var lastChar = startsWithPattern[length];
+                    var nextLastChar = (char)(lastChar + 1);
+                    var startsWithEndPattern = startsWithPattern.Substring(0, length) + nextLastChar;
+
+
+                    string key;
+                    string[] keys;
+                    if (Is(member, out key, out keys))
+                    {
+                        _keyFilters.Add(new KeyFilter
+                        {
+                            PropertyName = propName,
+                            Type = _nameChanges[key],
+                            Value = startsWithPattern,
+                            Position = Array.IndexOf(keys, propName),
+                        });
+                    }
+                    else
+                    {
+                        _filter.Append(member.Member.Name);
+                        _filter.Append(" ge '");
+                        _filter.Append(startsWithPattern);
+                        _filter.Append("' and ");
+                        _filter.Append(member.Member.Name);
+                        _filter.Append(" lt '");
+                        _filter.Append(startsWithEndPattern);
+                        _filter.Append("'");
+                    }
+
+
+                    break;
                 case "Contains":
                     if (node.Arguments.Count == 1)
                     {
@@ -335,21 +491,23 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     }
                     break;
 
-                case "ToString":
-                    ConstantExpression constant;
+                //case "ToString":
+                //    ConstantExpression constant;
 
-                    if (node.Object != null)
-                    {
-                        var instance = _constantEvaluator.Evaluate(node.Object);
-                        constant = Expression.Constant(instance.ToString());
-                    }
-                    else
-                    {
-                        constant = Expression.Constant(string.Empty);
-                    }
-
-                    AppendConstant(constant);
-                    break;
+                //    if (node.Object != null)
+                //    {
+                //        var instance = _constantEvaluator.Evaluate(node.Object);
+                //        //node.Method.Invoke(instance,node.Arguments.Select(_constantEvaluator)
+                //        constant = Expression.Constant(instance.ToString());
+                //    }
+                //    else
+                //    {
+                //        constant = Expression.Constant(string.Empty);
+                //    }
+                //    var test = _constantEvaluator.Visit(node);
+                //    AppendConstant(test);
+                //    //AppendConstant(constant);
+                //    break;
 
                 default:
                     AppendConstant(_constantEvaluator.Evaluate(node));
@@ -394,7 +552,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     VisitMethodCall(node);
                     break;
             }
-            Logger.WarnFormat("Please report this if you see it in your logs, ID:F68BA48F-DA61-4DEB-A078-5D10F722E324");
+
             return false;
         }
 

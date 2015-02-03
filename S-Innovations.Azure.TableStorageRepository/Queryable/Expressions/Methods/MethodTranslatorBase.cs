@@ -10,11 +10,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     internal abstract class MethodTranslatorBase : IMethodTranslator
     {
         private readonly string _methodName;
-        private readonly IDictionary<string, string> _nameChanges;
+        //private readonly IDictionary<string, string> _nameChanges;
+        EntityTypeConfiguration _configuration;
 
-        protected MethodTranslatorBase(IDictionary<string, string> nameChanges, string methodName)
+        protected MethodTranslatorBase(EntityTypeConfiguration configuration, string methodName)
         {
-            _nameChanges = nameChanges;
+            //_nameChanges = nameChanges;
+            _configuration = configuration;
             _methodName = methodName;
         }
 
@@ -31,7 +33,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
                 throw new ArgumentOutOfRangeException("method", message);
             }
 
-            var expressionTranslator = new ExpressionTranslator(_nameChanges);
+            var expressionTranslator = new ExpressionTranslator(_configuration);
 
             MethodCallExpression targetMethod = method;
 

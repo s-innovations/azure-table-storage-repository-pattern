@@ -13,11 +13,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     internal sealed class WhereTranslator : IMethodTranslator
     {
         private const string MethodName = "Where";
-        private readonly IDictionary<string, string> _nameChanges;
+        //private readonly IDictionary<string, string> _nameChanges;
+        EntityTypeConfiguration _configuration;
 
-        public WhereTranslator(IDictionary<string, string> nameChanges)
+        public WhereTranslator(EntityTypeConfiguration configuration)
         {
-            _nameChanges = nameChanges;
+            //_nameChanges = nameChanges;
+            _configuration= configuration;
         }
 
         public string Name
@@ -33,7 +35,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
                 throw new ArgumentOutOfRangeException("method", message);
             }
 
-            var expressionTranslator = new ExpressionTranslator(_nameChanges);
+            var expressionTranslator = new ExpressionTranslator(_configuration);
             expressionTranslator.Translate(result, method);
         }
     }

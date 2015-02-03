@@ -18,8 +18,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
         /// <summary>
         ///     Constructor.
         /// </summary>
-        internal QueryTranslator(IDictionary<string, string> nameChanges)
-            : this(GetTranslators(nameChanges))
+        internal QueryTranslator(EntityTypeConfiguration configuration)
+            : this(GetTranslators(configuration))
         {
         }
 
@@ -65,16 +65,16 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
             // ReSharper restore ForCanBeConvertedToForeach
         }
 
-        private static IEnumerable<IMethodTranslator> GetTranslators(IDictionary<string, string> nameChanges)
+        private static IEnumerable<IMethodTranslator> GetTranslators(EntityTypeConfiguration configuration)
         {
             return new List<IMethodTranslator>
                 {
-                    new WhereTranslator(nameChanges),
-                    new FirstTranslator(nameChanges),
-                    new FirstOrDefaultTranslator(nameChanges),
-                    new SingleTranslator(nameChanges),
-                    new SingleOrDefaultTranslator(nameChanges),
-                    new SelectTranslator(nameChanges),
+                    new WhereTranslator(configuration),
+                    new FirstTranslator(configuration),
+                    new FirstOrDefaultTranslator(configuration),
+                    new SingleTranslator(configuration),
+                    new SingleOrDefaultTranslator(configuration),
+                    new SelectTranslator(configuration.NamePairs),
                     new TakeTranslator()
                 };
         }

@@ -12,8 +12,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     /// </summary>
     internal sealed class FirstTranslator : MethodTranslatorBase
     {
-        public FirstTranslator(IDictionary<string, string> nameChanges)
-            : base(nameChanges, "First")
+        public FirstTranslator(EntityTypeConfiguration configuration)
+            : base(configuration, "First")
         {
         }
 

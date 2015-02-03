@@ -12,8 +12,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     /// </summary>
     internal sealed class SingleOrDefaultTranslator : MethodTranslatorBase
     {
-        public SingleOrDefaultTranslator(IDictionary<string, string> nameChanges)
-            : base(nameChanges, "SingleOrDefault")
+        public SingleOrDefaultTranslator(EntityTypeConfiguration configuration)
+            : base(configuration, "SingleOrDefault")
         {
         }
 

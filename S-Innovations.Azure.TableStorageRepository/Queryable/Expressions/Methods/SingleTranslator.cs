@@ -12,8 +12,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     /// </summary>
     internal sealed class SingleTranslator : MethodTranslatorBase
     {
-        public SingleTranslator(IDictionary<string, string> nameChanges)
-            : base(nameChanges, "Single")
+        public SingleTranslator(EntityTypeConfiguration configuration)
+            : base(configuration, "Single")
         {
         }
 

@@ -70,7 +70,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             _repository = cloudTable;
             _entityConfiguration = entityConverter;
-            _queryTranslator = new QueryTranslator(entityConverter.NamePairs);
+            _queryTranslator = new QueryTranslator(entityConverter);
         }
 
         /// <summary>

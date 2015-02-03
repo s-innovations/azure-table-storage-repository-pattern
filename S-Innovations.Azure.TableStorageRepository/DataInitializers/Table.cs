@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SInnovations.Azure.TableStorageRepository.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +7,51 @@ using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.DataInitializers
 {
+    public class DropTablesAndCreateIfExist<TableContext> : Initializer<TableContext> where TableContext : ITableStorageContext
+    {
+        static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
+        private Type[] ignored;
+        public DropTablesAndCreateIfExist(params Type[] ignored)
+        {
+            this.ignored = ignored;
+        }
+        public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
+        {
+           
+            foreach (var tableType in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
+            {
+                var configuration = EntityTypeConfigurationsContainer.Configurations[tableType];
+                //DROP
+                var table = context.GetTable(configuration.TableName);
+                {
+                    table.DeleteIfExists();
+                    var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + "Index").DeleteIfExistsAsync()).ToArray();
+                    Task.WaitAll(tasks);
+                }
+
+                //Now wait for it to be deleted.
+                while(true)
+                {
+                    try
+                    {
+                        context.GetTable(configuration.TableName).CreateIfNotExists();
+                        var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + "Index").CreateIfNotExistsAsync()).ToArray();
+                        Task.WaitAll(tasks);
+                        
+                        Logger.Info("Creating was successfull");
+                        return;
+                    }catch(Exception ex)
+                    {
+                        Logger.InfoException("Creating caused exception, retrying", ex);
+                        Task.Delay(5000).Wait();
+                    }
+
+                }
+
+            }
+
+        }
+    }
     public class CreateTablesIfNotExists<TableContext> : Initializer<TableContext> where TableContext : ITableStorageContext
     {
         private Type[] ignored;
