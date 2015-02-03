@@ -60,7 +60,7 @@ namespace SInnovations.Azure.TableStorageRepository
    }
     public abstract class TableStorageContext : ITableStorageContext
     {
-        private readonly CloudStorageAccount _storage;
+        protected CloudStorageAccount StorageAccount {get; private set;}
         private static object _buildLock = new object();
        
         public InsertionMode InsertionMode { get; set; }
@@ -72,7 +72,7 @@ namespace SInnovations.Azure.TableStorageRepository
         private static object _lock = new object();
         public TableStorageContext(CloudStorageAccount storage)
         {
-            _storage = storage;
+            StorageAccount = storage;
             _client = new Lazy<CloudTableClient>(CreateClient);
 
 
@@ -190,7 +190,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private CloudTableClient CreateClient()
         {
-           var client= _storage.CreateCloudTableClient();
+           var client= StorageAccount.CreateCloudTableClient();
 
            
            if (this.RetryPolicy != null)
