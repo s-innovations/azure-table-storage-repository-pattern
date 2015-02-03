@@ -107,7 +107,12 @@ namespace SInnovations.Azure.TableStorageRepository
         }
     }
 
-
+    public class EncoderPair
+    {
+        //public string Key { get; set; }
+        public Func<string, string> Encoder {get;set;}
+        public Func<string, string> Decoder { get; set; }
+    }
     public abstract class EntityTypeConfiguration
     {
         // protected readonly TableStorageModelBuilder builder;
@@ -121,14 +126,14 @@ namespace SInnovations.Azure.TableStorageRepository
             Collections = new List<CollectionConfiguration>();
             NamePairs = new Dictionary<string, string>();
             EntityStates = new ConcurrentDictionary<long, Tuple<DateTimeOffset, string>>();
-            PropertiesToEncode = new List<string>();
+            PropertiesToEncode = new Dictionary<string,EncoderPair>(); // new List<string>();
             Properties = new List<PropertyConfiguration>();
         }
         public object KeyMapper { get; set; }
 
         public Dictionary<string, string> NamePairs { get; set; }
         public Dictionary<string, IndexConfiguration> Indexes { get; set; }
-        public List<string> PropertiesToEncode { get; set; }
+        public Dictionary<string,EncoderPair> PropertiesToEncode { get; set; }
         public List<CollectionConfiguration> Collections { get; set; }
         public List<PropertyConfiguration> Properties { get; set; }
 
@@ -204,8 +209,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
             var keyMapper = new KeysMapper<TEntityType>
             {
-                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, PropertiesToEncode.ToArray(), lengthQueue),
-                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey, PropertiesToEncode.ToArray(), lengthQueue)
+                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, lengthQueue),
+                RowKeyMapper = ConvertToStringKey(RowKeyExpression, out rowKey, lengthQueue)
             };
             if (!string.IsNullOrEmpty(partitionKey))
                 this.NamePairs.Add(partitionKey, "PartitionKey");
@@ -247,11 +252,11 @@ namespace SInnovations.Azure.TableStorageRepository
         private Action<TEntityType, IDictionary<string, EntityProperty>, string> GetReverseActionFrom<TPartitionKey>(MemberExpression memberEx)
         {
             var property = memberEx.Member as PropertyInfo;
-            if (PropertiesToEncode.Contains(property.Name))
+            if (PropertiesToEncode.Keys.Contains(property.Name))
                 return (a, dict, partitionkey) =>
                 {
                     EntityProperty prop = null;
-                    var key = StringTo(typeof(TPartitionKey), partitionkey.Base64Decode(), out prop);
+                    var key = StringTo(typeof(TPartitionKey), PropertiesToEncode[property.Name].Decoder(partitionkey), out prop);
                     if (prop != null)
                         dict[property.Name] = prop;
                     property.SetValue(a, key);
@@ -276,12 +281,15 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
                     PropertyInfo property = type.GetProperty(newEx.Members[i].Name);
+                    var part = parts[i];
+                    if (i + 1 == newEx.Members.Count && i + 1 < parts.Length)
+                        part = string.Join(TableStorageContext.KeySeparator, parts.Skip(i));
 
-                    if (PropertiesToEncode.Contains(newEx.Members[i].Name))
-                        parts[i] = parts[i].Base64Decode();
+                    if (PropertiesToEncode.Keys.Contains(newEx.Members[i].Name))
+                        parts[i] = PropertiesToEncode[newEx.Members[i].Name].Decoder(part);//.Base64Decode();
 
                     EntityProperty prop = null;
-                    var value = StringTo(property.PropertyType, parts[i], out prop);
+                    var value = StringTo(property.PropertyType, part, out prop);
 
 
                     if (property.SetMethod == null)
@@ -320,7 +328,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             string key = "";
 
-            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key, PropertiesToEncode.ToArray());
+            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key);
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
                 Finder = entityToKeyProperty,
@@ -328,7 +336,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 GetIndexKeyFunc = (objs) =>
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
-                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(obj, PropertiesToEncode.Contains(propNames[idx]))));
+                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(obj,  GetEncoder(propNames[idx]))));
                     return idxKey;
                 }
             });
@@ -337,18 +345,35 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return this;
         }
+        public Func<string,string> GetEncoder(string name)
+        {
+            if (PropertiesToEncode.ContainsKey(name))
+                return PropertiesToEncode[name].Encoder;
+            return null;
+        }
 
-
-        public EntityTypeConfiguration<TEntityType> UseBase64EncodingFor<T>(Expression<Func<TEntityType, T>> expression)
+        public EntityTypeConfiguration<TEntityType> UseEncodingFor<T>(Expression<Func<TEntityType, T>> expression, Func<string,string> encoder,Func<string,string> decoder)
         {
             if (expression.Body is MemberExpression)
             {
                 var memberEx = expression.Body as MemberExpression;
-                PropertiesToEncode.Add(memberEx.Member.Name);
+                PropertiesToEncode.Add(memberEx.Member.Name, new EncoderPair { Decoder = decoder, Encoder = encoder });
             }
 
 
             return this;
+        }
+        public EntityTypeConfiguration<TEntityType> UseBase64EncodingFor<T>(Expression<Func<TEntityType, T>> expression)
+        {
+            return UseEncodingFor<T>(expression, StringExtensions.Base64Encode, StringExtensions.Base64Decode);
+            //if (expression.Body is MemberExpression)
+            //{
+            //    var memberEx = expression.Body as MemberExpression;
+            //    PropertiesToEncode.Add(memberEx.Member.Name);
+            //}
+
+
+          //  return this;
         }
         public EntityTypeConfiguration<TEntityType> WithEnumProperties()
         {
@@ -475,7 +500,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public static Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, string[] encodedProperties, Queue<LengthPadding?> lenghts = null)
+        public Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, Queue<LengthPadding?> lenghts = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -484,7 +509,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 var propertyName = memberEx.Member.Name;
                 key = propertyName;
                 var length = (lenghts == null || lenghts.Count == 0) ? (LengthPadding?)null : lenghts.Dequeue();
-                return (o) => ConvertToString(func(o), encodedProperties.Contains(propertyName), length);
+                return (o) => ConvertToString(func(o), GetEncoder(propertyName), length);
             }
             else if (expression.Body is NewExpression)
             {
@@ -504,7 +529,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     var obj = func(o);
 
-                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), encodedProperties.Contains(properties[i].Name), lenghtsList[i])
+                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj),  GetEncoder(properties[i].Name), lenghtsList[i])
                     );
 
                     //If any nulls, then the key becomes a enmpty string.
@@ -523,7 +548,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return (a) => "";
 
         }
-        private static string ConvertToString(object obj, bool encode, LengthPadding? fixedLength = null)
+        private static string ConvertToString(object obj, Func<string,string> encoder=null, LengthPadding? fixedLength = null)
         {
             if (obj == null)
                 return null;
@@ -540,8 +565,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
             }
             var str = obj.ToString();
-            if (encode)
-                return str.Base64Encode();
+            if (encoder != null)
+                return encoder(str);// str.Base64Encode();
             return str;
         }
         public static bool IsStringConvertable(Type type)
