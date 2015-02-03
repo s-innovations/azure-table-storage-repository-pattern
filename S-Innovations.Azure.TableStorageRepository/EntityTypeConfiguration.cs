@@ -281,15 +281,17 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
                     PropertyInfo property = type.GetProperty(newEx.Members[i].Name);
-                    var part = parts[i];
-                    if (i + 1 == newEx.Members.Count && i + 1 < parts.Length)
-                        part = string.Join(TableStorageContext.KeySeparator, parts.Skip(i));
 
-                    if (PropertiesToEncode.Keys.Contains(newEx.Members[i].Name))
-                        parts[i] = PropertiesToEncode[newEx.Members[i].Name].Decoder(part);//.Base64Decode();
+                    
+                        if (i + 1 == newEx.Members.Count && i + 1 < parts.Length)
+                            parts[i] = string.Join(TableStorageContext.KeySeparator, parts.Skip(i));
 
+                        if (PropertiesToEncode.Keys.Contains(newEx.Members[i].Name))
+                            parts[i] = PropertiesToEncode[newEx.Members[i].Name].Decoder(parts[i]);//.Base64Decode();
+
+                  
                     EntityProperty prop = null;
-                    var value = StringTo(property.PropertyType, part, out prop);
+                    var value = StringTo(property.PropertyType, parts[i], out prop);
 
 
                     if (property.SetMethod == null)

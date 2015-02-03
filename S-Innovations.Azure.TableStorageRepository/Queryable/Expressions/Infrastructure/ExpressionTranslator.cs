@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.Logging;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -16,6 +18,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
     /// </summary>
     internal sealed class ExpressionTranslator : ExpressionVisitor
     {
+        static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
+
         private readonly ExpressionEvaluator _constantEvaluator;
         private readonly IDictionary<string, string> _nameChanges;
         private StringBuilder _filter;
@@ -50,7 +54,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             _filter = new StringBuilder();
 
             Visit(lambda.Body);
-
+           
             _result.AddFilter(TrimString(_filter));
         }
 
@@ -128,6 +132,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 _filter.Append("(");
             }
 
+            //If its part of partition or rowkey
+           
+
             // Left part
             if (leftType == ExpressionType.Call)
             {
@@ -135,6 +142,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 {
                     return binary;
                 }
+            }else if (IsPartionOrRowKeyNameChange(binary))
+            {
+                return binary;
             }
             else
             {
@@ -166,6 +176,53 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
 
             return binary;
+        }
+
+        private bool IsPartionOrRowKeyNameChange(BinaryExpression binary)
+        {
+            var left = binary.Left;
+            if (left.NodeType == ExpressionType.MemberAccess)
+            {
+                var member = (MemberExpression)binary.Left;
+                foreach (var key in _nameChanges.Keys)
+                {
+
+                    var keys = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    if (keys.Skip(1).Any())
+                    {
+                        if (keys.Contains(member.Member.Name))
+                        {
+                            var old = _filter;
+                            var startsWithPattern = "";
+                            _filter = new StringBuilder();
+                            AppendBinaryPart(binary.Right, binary.Right.NodeType);
+                            startsWithPattern = _filter.ToString().Trim('\'');
+                            _filter = old;
+
+
+                            var length = startsWithPattern.Length - 1;
+                            var lastChar = startsWithPattern[length];
+                            var nextLastChar = (char)(lastChar + 1);
+                            var startsWithEndPattern = startsWithPattern.Substring(0, length) + nextLastChar;
+
+                            _filter.Append(_nameChanges[key]);
+                            _filter.Append(" ge '");
+                            _filter.Append(startsWithPattern);
+                            _filter.Append("' and ");
+                            _filter.Append(_nameChanges[key]);
+                            _filter.Append(" lt '");
+                            _filter.Append(startsWithEndPattern);
+                            _filter.Append("'");
+
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
+            }
+            return false;
         }
 
         private void AppendBinaryPart(Expression node, ExpressionType type)
@@ -337,7 +394,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     VisitMethodCall(node);
                     break;
             }
-
+            Logger.WarnFormat("Please report this if you see it in your logs, ID:F68BA48F-DA61-4DEB-A078-5D10F722E324");
             return false;
         }
 
