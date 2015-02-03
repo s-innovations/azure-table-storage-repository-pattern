@@ -60,12 +60,12 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             Table.SetInitializer(new CreateTablesIfNotExists<MyTableStorageContext>());
         }
         public string test {get;set;}
-        public MyTableStorageContext() : base(CloudStorageAccount.Parse(File.ReadAllText("C:\\dev\\storagekey.txt")), true)
+        public MyTableStorageContext() : base(CloudStorageAccount.Parse(File.ReadAllText("C:\\dev\\storagekey.txt")))
         {
             test = "a";
             this.InsertionMode = InsertionMode.AddOrMerge;
         }
-        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)
+        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder)
         {
             modelbuilder.Entity<Person>().HasKeys((c) => c.FamilyName, c => c.FirstName)
                 .WithIndex(p=>p.FirstName)

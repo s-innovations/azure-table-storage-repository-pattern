@@ -40,7 +40,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
             this.InsertionMode = InsertionMode.AddOrReplace;
         }
-        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)
+        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder)
         {
 
             modelbuilder.Entity<MyModel>()

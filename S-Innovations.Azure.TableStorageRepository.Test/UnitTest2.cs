@@ -56,7 +56,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
             this.InsertionMode = InsertionMode.AddOrMerge;
         }
-        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)
+        protected override void OnModelCreating(TableStorageModelBuilder modelbuilder)
         {
             modelbuilder.Entity<SubItem>().HasKeys(t=>t.Name,t=>t.LastName).ToTable("testtable");
             modelbuilder.Entity<MyTestPoco>()
