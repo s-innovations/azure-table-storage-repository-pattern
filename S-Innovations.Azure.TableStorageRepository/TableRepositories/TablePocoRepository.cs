@@ -21,23 +21,24 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            ITableRepository<TEntity>
     {
         private readonly Expression _expression;
-        private new readonly EntityTypeConfiguration<TEntity> configuration;
+        //protected new readonly EntityTypeConfiguration<TEntity> configuration;
+        protected new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
-        public TablePocoRepository(ITableStorageContext context, EntityTypeConfiguration<TEntity> configuration)
-            : base(context, configuration)
+        public TablePocoRepository(ITableStorageContext context, Lazy<EntityTypeConfiguration<TEntity>> configuration)
+            : base(context, new Lazy<EntityTypeConfiguration>(() => configuration.Value))
         {
-            this.configuration = configuration;
+           // this.configuration = configuration;
             _expression = Expression.Constant(this);
-            _provider = new TableQueryProvider<TEntity>(this, configuration);
+            _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(this, configuration.Value));
         }
         public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
         {
-            return table.CreateQuery<T>();            
+            return Table.CreateQuery<T>();            
         }
-        public CloudTable Table
-        {
-            get { return table; }
-        }
+        //public CloudTable Table
+        //{
+        //    get { return table; }
+        //}
 
         //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
@@ -50,7 +51,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             if (this.configuration == null)
                 throw new Exception("Configuration was not created");
-            var mapper = this.configuration.GetKeyMappers<TEntity>();
+            var mapper = Configuration.GetKeyMappers<TEntity>();
            
 
             if (mapper.PartitionKeyMapper == null)
@@ -92,7 +93,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             };
 
           
-            return table.ExecuteQuery(query);
+            return Table.ExecuteQuery(query);
         }
 
         /// <summary>
@@ -112,7 +113,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 TakeCount = tableQuery.TakeCount
             };
 
-            return table.ExecuteQueryAsync(query, cancellationToken);
+            return Table.ExecuteQueryAsync(query, cancellationToken);
         }
 
         /// <summary>
@@ -126,7 +127,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public TableResult Execute(TableOperation operation)
         {
-            return table.Execute(operation);
+            return Table.Execute(operation);
         }
 
         /// <summary>
@@ -141,7 +142,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public Task<TableResult> ExecuteAsync(TableOperation operation, CancellationToken cancellationToken)
         {
-            return table.ExecuteAsync(operation, cancellationToken);
+            return Table.ExecuteAsync(operation, cancellationToken);
         }
 
         /// <summary>
@@ -158,7 +159,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public IList<TableResult> ExecuteBatch(TableBatchOperation batch)
         {
-            return table.ExecuteBatch(batch);
+            return Table.ExecuteBatch(batch);
         }
 
         /// <summary>
@@ -175,7 +176,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public Task<IList<TableResult>> ExecuteBatchAsync(TableBatchOperation tableBatchOperation, CancellationToken cancellationToken)
         {
-            return table.ExecuteBatchAsync(tableBatchOperation, cancellationToken);
+            return Table.ExecuteBatchAsync(tableBatchOperation, cancellationToken);
         }
 
 
@@ -183,40 +184,40 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public void Add(TEntity entity)
         {
-            base.Add(new EntityAdapter<TEntity>(configuration,entity));
+            base.Add(new EntityAdapter<TEntity>(Configuration, entity));
         }
         public void Add(TEntity entity, string partitionKey, string rowKey)
         {
-            base.Add(new EntityAdapter<TEntity>(configuration, entity),partitionKey,rowKey);
+            base.Add(new EntityAdapter<TEntity>(Configuration, entity), partitionKey, rowKey);
         }
         public void Add(TEntity entity, IDictionary<string,EntityProperty> additionalProperties){
-            base.Add(new EntityAdapter<TEntity>(configuration, entity) { Properties = additionalProperties });
+            base.Add(new EntityAdapter<TEntity>(Configuration, entity) { Properties = additionalProperties });
         }
 
         public void Delete(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
-            if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Delete(new EntityAdapter<TEntity>(configuration,entity, _state.Item1, _state.Item2));
+            if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
+                base.Delete(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2));
             else
-                base.Delete(new EntityAdapter<TEntity>(configuration,entity, null, "*"));
+                base.Delete(new EntityAdapter<TEntity>(Configuration, entity, null, "*"));
 
         }
         public void Update(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
         {
             Tuple<DateTimeOffset, string> _state;
-            if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Update(new EntityAdapter<TEntity>(configuration, entity, _state.Item1, _state.Item2) { Properties = additionalProperties });
+            if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
+                base.Update(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2) { Properties = additionalProperties });
             else
-                base.Update(new EntityAdapter<TEntity>(configuration, entity, null, "*") { Properties = additionalProperties });
+                base.Update(new EntityAdapter<TEntity>(Configuration, entity, null, "*") { Properties = additionalProperties });
         }
         public void Update(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
-            if (configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Update(new EntityAdapter<TEntity>(configuration,entity, _state.Item1, _state.Item2));
+            if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
+                base.Update(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2));
             else
-                base.Update(new EntityAdapter<TEntity>(configuration,entity, null, "*"));
+                base.Update(new EntityAdapter<TEntity>(Configuration,entity, null, "*"));
 
         }
 
@@ -259,7 +260,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             tableQuery.FilterString = TableQuery.CombineFilters(tableQuery.FilterString, TableOperators.And,
             TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
 
-            var entity = await table.ExecuteQueryAsync(tableQuery);
+            var entity = await Table.ExecuteQueryAsync(tableQuery);
             if (!entity.Any())
                 return new Dictionary<string,EntityProperty>();
 
@@ -313,13 +314,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             get { return typeof(TEntity); }
         }
 
-        private IQueryProvider _provider;
+        private Lazy<IQueryProvider> _provider;
         public IQueryProvider Provider {
             get
             {
                 if (BaseQuery != null)
                     return BaseQuery.Provider;
-                return _provider;
+                return _provider.Value;
             }
         }
 

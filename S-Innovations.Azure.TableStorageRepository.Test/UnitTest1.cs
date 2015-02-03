@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
+using SInnovations.Azure.TableStorageRepository.DataInitializers;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -54,10 +55,14 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
     public class MyTableStorageContext : TableStorageContext
     {   
-        public MyTableStorageContext() : base(new CloudStorageAccount(
-            new StorageCredentials("c1azuretests",File.ReadAllText("C:\\dev\\storagekey.txt")), true))
+        static MyTableStorageContext()
         {
-
+            Table.SetInitializer(new CreateTablesIfNotExists<MyTableStorageContext>());
+        }
+        public string test {get;set;}
+        public MyTableStorageContext() : base(CloudStorageAccount.Parse(File.ReadAllText("C:\\dev\\storagekey.txt")), true)
+        {
+            test = "a";
             this.InsertionMode = InsertionMode.AddOrMerge;
         }
         protected override void OnModelCreating(TableStorageModelBuilder modelbuilder, params object[] modelBuilderParams)

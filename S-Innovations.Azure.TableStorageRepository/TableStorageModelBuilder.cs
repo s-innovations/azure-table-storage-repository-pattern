@@ -9,29 +9,47 @@ namespace SInnovations.Azure.TableStorageRepository
     public static class EntityTypeConfigurationsContainer
     {
         static internal ConcurrentDictionary<Type, EntityTypeConfiguration> Configurations = new ConcurrentDictionary<Type, EntityTypeConfiguration>();
-        static internal ConcurrentDictionary<Type, TableStorageModelBuilder> ModelBuilders = new ConcurrentDictionary<Type, TableStorageModelBuilder>(); 
+        static internal ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>> ModelBuilders = new ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>>();
 
-        public static  EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
+       
+        public static EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
         {
 
+
             if (!Configurations.ContainsKey(typeof(TEntityType)))
+            {
                 Configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>());
+                foreach (var value in ModelBuilders.Values.Where(v=>v.Value.Entities == null))
+                    value.Value.Builder();
+            }
             return (EntityTypeConfiguration<TEntityType>)Configurations[typeof(TEntityType)];
+          
+
+            throw new InvalidOperationException("Something vent wrong");
         }
     }
 
     public class TableStorageModelBuilder
     {
-        internal List<Type> entities;
+
+
+
+        internal List<Type> Entities;
+        
         public TableStorageModelBuilder()
         {
-            entities = new List<Type>();
+           
+           
         }
         public EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
         {
-            entities.Add(typeof(TEntityType));
+            if (Entities == null)
+                Entities = new List<Type>();
+           
+            Entities.Add(typeof(TEntityType));
             return EntityTypeConfigurationsContainer.Entity<TEntityType>();           
         }
-        
+
+        public Action Builder { get; set; }
     }
 }

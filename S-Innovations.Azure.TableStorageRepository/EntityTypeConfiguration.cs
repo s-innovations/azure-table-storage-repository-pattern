@@ -449,7 +449,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 var memberEx = expression.Body as MemberExpression;
 
                 Func<ITableStorageContext, ITableRepository<T>> activator =
-                    (ctx) => Factory.RepositoryFactory<T>(ctx, EntityTypeConfigurationsContainer.Entity<T>());
+                    (ctx) => Factory.RepositoryFactory<T>(ctx);
 
                 //this.builder.Entity<TEntityType>()                 
                 this.Collections.Add(new CollectionConfiguration

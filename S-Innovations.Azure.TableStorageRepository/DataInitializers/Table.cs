@@ -16,7 +16,7 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
         public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
         {
            
-            foreach (var table in modelbuilder.entities.Where(t=>!ignored.Any(tt=>t==tt)))
+            foreach (var table in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
                 var configuration = EntityTypeConfigurationsContainer.Configurations[table];
                 context.GetTable(configuration.TableName).CreateIfNotExists();

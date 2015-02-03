@@ -5,32 +5,49 @@ using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
     internal static class Factory
     {
-        public static ITableRepository<TEntity> RepositoryFactory<TEntity>(ITableStorageContext ctx, EntityTypeConfiguration config)
+        internal static MethodInfo EntityConfigTypeMethod = typeof(EntityTypeConfigurationsContainer).GetMethods().Single(x => x.IsGenericMethod && x.Name == "Entity");
+        internal static Type TablePocoRepositoryType = typeof(TablePocoRepository<>);
+        internal static Type EntityConfigurationType = typeof(EntityTypeConfiguration<>);
+        internal static Type LazyType = typeof(Lazy<>);
+        internal static Type FuncType = typeof(Func<>);
+
+        public static ITableRepository RepositoryFactory(ITableStorageContext ctx, Type EntityType)
         {
-            var TableEntityRepositoryType = typeof(TableEntityRepository<>);
-            var TablePocoRepositoryType = typeof(TablePocoRepository<>);
+            // var TableRepositoryType = IsEntityType ? TableEntityRepositoryType : TablePocoRepositoryType;
 
-            var EntityType = typeof(TEntity);
-            var IsEntityType = (typeof(ITableEntity).IsAssignableFrom(EntityType));
-            var TableRepositoryType = IsEntityType ? TableEntityRepositoryType : TablePocoRepositoryType;
+            var EntityConfigType = EntityConfigurationType.MakeGenericType(EntityType);
+            var lazyType = LazyType.MakeGenericType(EntityConfigType);
+            var argumetns = new Object[] 
+                    { 
+                        ctx, 
+                        Activator.CreateInstance( //Lazy<EntityTypeConfiguration<EntityType>>
+                            lazyType, 
+                            new Object[]{ 
+                                Delegate.CreateDelegate(FuncType.MakeGenericType(EntityConfigType),
+                                EntityConfigTypeMethod.MakeGenericMethod(EntityType))
+                            }) 
+                    };
 
-            var argumetns = new Object[] { ctx, config };
 
             var rep = Activator.CreateInstance(
-                        TableRepositoryType.MakeGenericType(EntityType), argumetns) as ITableRepository<TEntity>;
+                TablePocoRepositoryType.MakeGenericType(EntityType), argumetns) as ITableRepository;
 
-            //if(parent!=null)
-            //    (( TableRepository<TEntity>)rep).parentQuery = from ent in parent.Source
-            //                                                   where ent.
 
             return rep;
+        }
+        public static ITableRepository<TEntity> RepositoryFactory<TEntity>(ITableStorageContext ctx)
+        {
+            return RepositoryFactory(ctx, typeof(TEntity)) as ITableRepository<TEntity>;
         }
 
 
@@ -59,43 +76,48 @@ namespace SInnovations.Azure.TableStorageRepository
             _client = new Lazy<CloudTableClient>(CreateClient);
 
 
-            //TableStorageModelBuilder builder =
-            //    EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
-            //        this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
-            //        {
-            //                var abuilder = new TableStorageModelBuilder();
-            //                OnModelCreating(abuilder);
-            //                return abuilder;
-            //        }));
-            TableStorageModelBuilder builder;
-            if (EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()))
-                EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder);
-            else
-            {
-                lock(_lock)
-                {
-                    //Check that if it was added
-                    if (!(EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()) 
-                        && EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder)))
+            TableStorageModelBuilder builder =
+                EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
+                    this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
                     {
-                        builder = new TableStorageModelBuilder();
+                        var abuilder = new TableStorageModelBuilder();
+                        abuilder.Builder = () =>
+                        {
 
-                        OnModelCreating(builder, modelBuilderParams);
-                        EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
-                    }
-                }
-            }
+                            OnModelCreating(abuilder, modelBuilderParams);
+                            if (Table.inits.ContainsKey(this.GetType()))
+                            {
+                                var init = Table.inits[this.GetType()];
+                                init.Initialize(this, abuilder);
+                                Table.inits.Remove(this.GetType());
+                            }
+                        };
+                        return abuilder;
+                    }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+            //TableStorageModelBuilder builder;
+            //if (EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()))
+            //    EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder);
+            //else
+            //{
+            //    lock(_lock)
+            //    {
+            //        //Check that if it was added
+            //        if (!(EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()) 
+            //            && EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder)))
+            //        {
+            //            builder = new TableStorageModelBuilder();
+
+            //            OnModelCreating(builder, modelBuilderParams);
+            //            EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
+            //        }
+            //    }
+            //}
 
 
             BuildModel(builder);
 
           
-            if(Table.inits.ContainsKey(this.GetType()))
-            {
-                var init = Table.inits[this.GetType()];
-                init.Initialize(this, builder);
-                Table.inits.Remove(this.GetType());
-            }
+           
 
             InsertionMode = InsertionMode.Add;
         }
@@ -111,10 +133,10 @@ namespace SInnovations.Azure.TableStorageRepository
         }
         
 
-        public TableEntityRepository<TEntity> TableEntityRepository<TEntity>() where TEntity : ITableEntity,new()
-        {
-            throw new NotImplementedException();
-        }
+        //public TableEntityRepository<TEntity> TableEntityRepository<TEntity>() where TEntity : ITableEntity,new()
+        //{
+        //    throw new NotImplementedException();
+        //}
 
         public virtual Task SaveChangesAsync()
         {
@@ -130,24 +152,14 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private void BuildModel(TableStorageModelBuilder modelbuilder)
         {
-            //TODO CACHE THIS
-
-            var type = this.GetType();
-            var TableEntityRepositoryType = typeof(TableEntityRepository<>);
-            var TablePocoRepositoryType = typeof(TablePocoRepository<>);
-
-            foreach(var repository in type.GetProperties().Where(p=>p.PropertyType.IsGenericType))
+         
+            foreach(var repository in this.GetType().GetProperties().Where(p=>p.PropertyType.IsGenericType))
             {
                 if (typeof(ITableRepository<>).IsAssignableFrom(repository.PropertyType.GetGenericTypeDefinition()))
                 {
                     var EntityType = repository.PropertyType.GenericTypeArguments[0];
-                    var IsEntityType= (typeof(ITableEntity).IsAssignableFrom(EntityType));
-                    var TableRepositoryType = IsEntityType?TableEntityRepositoryType:TablePocoRepositoryType;
-
-                    var argumetns = new Object[] { this, EntityTypeConfigurationsContainer.Configurations[EntityType] };
-
-                    var rep = Activator.CreateInstance(
-                        TableRepositoryType.MakeGenericType(EntityType), argumetns) as ITableRepository;
+                    var rep = Factory.RepositoryFactory(this, EntityType);
+                  
                     repositories.Add(rep);
                     repository.SetValue(this, rep);
                     
@@ -155,8 +167,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 }
             }
         }
-
-
+       
 
         public CloudTable GetTable(string name)
         {
