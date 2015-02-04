@@ -39,7 +39,7 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
                         Task.WaitAll(tasks);
                         
                         Logger.Info("Creating was successfull");
-                        return;
+                        break;
                     }catch(Exception ex)
                     {
                         Logger.InfoException("Creating caused exception, retrying", ex);

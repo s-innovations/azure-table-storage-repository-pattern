@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
-    public struct KeysMapper<TEntity>
+    public class KeysMapper<TEntity>
     {
         public Func<TEntity, String> PartitionKeyMapper { get; set; }
         public Func<TEntity, String> RowKeyMapper { get; set; }
