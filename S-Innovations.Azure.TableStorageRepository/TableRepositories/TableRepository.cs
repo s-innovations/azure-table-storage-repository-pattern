@@ -262,6 +262,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return entity;
 
             var mapper = Configuration.GetKeyMappers<TEntity>();
+            if (mapper == null)
+                throw new Exception("Mapper was not configured");
+
             entity.PartitionKey = mapper.PartitionKeyMapper(entity);
             entity.RowKey = mapper.RowKeyMapper(entity);
             return entity;
