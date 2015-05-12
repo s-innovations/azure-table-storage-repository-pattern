@@ -11,16 +11,22 @@ namespace SInnovations.Azure.TableStorageRepository
         static internal ConcurrentDictionary<Type, EntityTypeConfiguration> Configurations = new ConcurrentDictionary<Type, EntityTypeConfiguration>();
         static internal ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>> ModelBuilders = new ConcurrentDictionary<Type, Lazy<TableStorageModelBuilder>>();
 
-       
+        static object locker = new object();
         public static EntityTypeConfiguration<TEntityType> Entity<TEntityType>()
         {
 
 
             if (!Configurations.ContainsKey(typeof(TEntityType)))
             {
-                Configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>());
-                foreach (var value in ModelBuilders.Values.Where(v=>v.Value.Entities == null))
-                    value.Value.Builder();
+                lock (locker)
+                {
+                    if (!Configurations.ContainsKey(typeof(TEntityType)))
+                    {
+                        Configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>());
+                        foreach (var value in ModelBuilders.Values.Where(v => v.Value.Entities == null))
+                            value.Value.Builder();
+                    }
+                }
             }
             return (EntityTypeConfiguration<TEntityType>)Configurations[typeof(TEntityType)];
           
