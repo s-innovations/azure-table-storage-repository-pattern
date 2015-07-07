@@ -27,6 +27,7 @@ namespace SInnovations.Azure.TableStorageRepository
     }
     public class EntityAdapter<T> : IEntityAdapter, ITableEntity
     {
+        ITableStorageContext context;
         EntityTypeConfiguration<T> config;
         public EntityAdapter()
         {
@@ -35,8 +36,9 @@ namespace SInnovations.Azure.TableStorageRepository
             this.config = EntityTypeConfigurationsContainer.Entity<T>();
         }
 
-        internal EntityAdapter(EntityTypeConfiguration<T> config, T innerObject, DateTimeOffset? timestamp = null, string Etag = null)
+        internal EntityAdapter(ITableStorageContext context , EntityTypeConfiguration<T> config, T innerObject, DateTimeOffset? timestamp = null, string Etag = null)
         {
+            this.context = context;
             this.InnerObject = innerObject;
             if (timestamp.HasValue)
                 this.Timestamp = timestamp.Value;
@@ -152,7 +154,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     if (value.BinaryValue.Length > 64000)
                     {
 
-                        tasks.Add(config.SizeReducerAsync(key, value, properties));
+                        tasks.Add(config.SizeReducerAsync(context, key, value, properties));
                     }
                 }
             }

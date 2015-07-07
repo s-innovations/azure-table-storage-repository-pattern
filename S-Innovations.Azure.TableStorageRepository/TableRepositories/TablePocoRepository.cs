@@ -187,40 +187,40 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public void Add(TEntity entity)
         {
-            base.Add(new EntityAdapter<TEntity>(Configuration, entity));
+            base.Add(new EntityAdapter<TEntity>(context,Configuration, entity));
         }
         public void Add(TEntity entity, string partitionKey, string rowKey)
         {
-            base.Add(new EntityAdapter<TEntity>(Configuration, entity), partitionKey, rowKey);
+            base.Add(new EntityAdapter<TEntity>(context, Configuration, entity), partitionKey, rowKey);
         }
         public void Add(TEntity entity, IDictionary<string,EntityProperty> additionalProperties){
-            base.Add(new EntityAdapter<TEntity>(Configuration, entity) { Properties = additionalProperties });
+            base.Add(new EntityAdapter<TEntity>(context, Configuration, entity) { Properties = additionalProperties });
         }
 
         public void Delete(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
             if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Delete(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2));
+                base.Delete(new EntityAdapter<TEntity>(context, Configuration, entity, _state.Item1, _state.Item2));
             else
-                base.Delete(new EntityAdapter<TEntity>(Configuration, entity, null, "*"));
+                base.Delete(new EntityAdapter<TEntity>(context, Configuration, entity, null, "*"));
 
         }
         public void Update(TEntity entity, IDictionary<string, EntityProperty> additionalProperties)
         {
             Tuple<DateTimeOffset, string> _state;
             if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Update(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2) { Properties = additionalProperties });
+                base.Update(new EntityAdapter<TEntity>(context, Configuration, entity, _state.Item1, _state.Item2) { Properties = additionalProperties });
             else
-                base.Update(new EntityAdapter<TEntity>(Configuration, entity, null, "*") { Properties = additionalProperties });
+                base.Update(new EntityAdapter<TEntity>(context, Configuration, entity, null, "*") { Properties = additionalProperties });
         }
         public void Update(TEntity entity)
         {
             Tuple<DateTimeOffset, string> _state;
             if (Configuration.EntityStates.TryGetValue(entity.GetHashCode(), out _state))
-                base.Update(new EntityAdapter<TEntity>(Configuration, entity, _state.Item1, _state.Item2));
+                base.Update(new EntityAdapter<TEntity>(context, Configuration, entity, _state.Item1, _state.Item2));
             else
-                base.Update(new EntityAdapter<TEntity>(Configuration,entity, null, "*"));
+                base.Update(new EntityAdapter<TEntity>(context, Configuration, entity, null, "*"));
 
         }
 

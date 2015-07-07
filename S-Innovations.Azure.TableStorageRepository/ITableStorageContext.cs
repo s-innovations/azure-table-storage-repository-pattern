@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.RetryPolicies;
+﻿using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
@@ -18,6 +19,7 @@ namespace SInnovations.Azure.TableStorageRepository
         IRetryPolicy RetryPolicy { get; set; }
         InsertionMode InsertionMode { get; set; }
         CloudTable GetTable(string name);
+        CloudStorageAccount StorageAccount { get; }
     }
     public enum EntityState
     {
