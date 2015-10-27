@@ -22,7 +22,10 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
         static ProductContext()
         {
+            //TO DROP THE TEST TABLE USE COMMENTED LINE. Dont use in production :)
             Table.SetInitializer(new CreateTablesIfNotExists<ProductContext>());
+           // Table.SetInitializer(new DropTablesAndCreateIfExist<ProductContext>());
+            
         }
         public ProductContext()
             : base(CloudStorageAccount.Parse(File.ReadAllText(@"c:\dev\teststorage.txt")))
