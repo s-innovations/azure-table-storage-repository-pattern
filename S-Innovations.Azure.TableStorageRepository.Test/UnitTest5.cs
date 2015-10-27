@@ -34,9 +34,8 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         protected override void OnModelCreating(TableStorageModelBuilder modelbuilder)
         {
             modelbuilder.Entity<Product>()
-                .HasKeys(pk => pk.Category, rk =>new {  rk.Store, rk.ProductId})
-             //   .HasKeys(pk => pk.Category,rk=>string.Format("{0}_{1}", rk.Store.ToLower(), rk.ProductId))              
-                .ToTable("unittest5");
+                .HasKeys(pk => pk.Category, rk =>new {  rk.Store, rk.ProductId})                
+                .ToTable("unittest7");
 
             base.OnModelCreating(modelbuilder);
         }
@@ -51,20 +50,29 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         {
             var cat = "test";
             var ctx = new ProductContext();
-            ctx.Products.Add(new Product
+            var insertObj = new Product
             {
                 ProductId = 1,
                 Name = "MyName",
                 ImageName = "atest",
                 Category = cat,
                 Description = "adsad",
-                Store = "test",
-            });
+                Store = "test_abc",
+            };
+            ctx.Products.Add(insertObj);
             ctx.SaveChangesAsync().Wait();
 
             var products = (from f in ctx.Products
                             where f.Category == cat
                             select f).ToArray();
+
+            Assert.AreEqual(insertObj.ProductId, products[0].ProductId, "ProductId");
+            Assert.AreEqual(insertObj.Store, products[0].Store, "Store");
+            Assert.AreEqual(insertObj.Name, products[0].Name, "Name");
+            Assert.AreEqual(insertObj.ImageName, products[0].ImageName, "ImageName");
+            Assert.AreEqual(insertObj.Description, products[0].Description, "Description");
+
+            //All is okay?
 
         }
     }
