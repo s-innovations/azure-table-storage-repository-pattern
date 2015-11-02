@@ -49,7 +49,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
     [TestClass]
     public class UnitTest5
     {
-        [TestMethod]
+//        [TestMethod]
         public async Task TestMethod1()
         {
             var cat = "test";
