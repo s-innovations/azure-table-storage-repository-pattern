@@ -5,6 +5,7 @@ using System.IO;
 using SInnovations.Azure.TableStorageRepository.DataInitializers;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -49,7 +50,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
     public class UnitTest5
     {
         [TestMethod]
-        public void TestMethod1()
+        public async Task TestMethod1()
         {
             var cat = "test";
             var ctx = new ProductContext();
@@ -74,6 +75,8 @@ namespace SInnovations.Azure.TableStorageRepository.Test
             Assert.AreEqual(insertObj.Name, products[0].Name, "Name");
             Assert.AreEqual(insertObj.ImageName, products[0].ImageName, "ImageName");
             Assert.AreEqual(insertObj.Description, products[0].Description, "Description");
+
+            var tes = await ctx.Products.FindByKeysAsync("test", "test_abc__1");
 
             //All is okay?
 
