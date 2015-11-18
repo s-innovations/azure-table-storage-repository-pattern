@@ -123,8 +123,8 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public void TestMethod0()
         {
             var a = new Test6Context(CloudStorageAccount.DevelopmentStorageAccount); Table.ClearInitializer<Test6Context>();
-            
-            var time = DateTimeOffset.Parse("2015-11-18T18:34:05.0630931");
+
+            var time = DateTimeOffset.Parse("2015-11-18T18:34:05.0630931+01:00");
             var id = "98DEA3AE-0D3D-44F7-BD12-B69F125362F5";
          
             
@@ -138,7 +138,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         public void TestMethod1()
         {
             var a = new Test6Context(CloudStorageAccount.DevelopmentStorageAccount); Table.ClearInitializer<Test6Context>();
-            var time = DateTimeOffset.Parse("2015-11-18T18:34:05.0630931");
+            var time = DateTimeOffset.Parse("2015-11-18T18:34:05.0630931+01:00");
             var id = "98DEA3AE-0D3D-44F7-BD12-B69F125362F5";
             var id2 = new Guid("98DEA3AE-0D3D-44F7-BD12-B69F125362F5");
 
