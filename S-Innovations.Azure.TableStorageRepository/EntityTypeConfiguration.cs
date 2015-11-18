@@ -1,5 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
+using SInnovations.Azure.TableStorageRepository.Logging;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections;
@@ -124,16 +125,18 @@ namespace SInnovations.Azure.TableStorageRepository
             // this.builder = builder;
             Indexes = new Dictionary<string, IndexConfiguration>();
             Collections = new List<CollectionConfiguration>();
-            NamePairs = new Dictionary<string, string>();
+            KeyMappings = new Dictionary<string, string>();
             EntityStates = new ConcurrentDictionary<long, Tuple<DateTimeOffset, string>>();
             PropertiesToEncode = new Dictionary<string, EncoderPair>(); // new List<string>();
             Properties = new List<PropertyConfiguration>();
+            IgnoreKeyPropertyRemovables = new Dictionary<string, object>();
         }
         public object KeyMapper { get; set; }
 
-        public Dictionary<string, string> NamePairs { get; set; }
+        public Dictionary<string, string> KeyMappings { get; set; }
         public Dictionary<string, IndexConfiguration> Indexes { get; set; }
         public Dictionary<string, EncoderPair> PropertiesToEncode { get; set; }
+        public Dictionary<string,object> IgnoreKeyPropertyRemovables { get; set; }
         public List<CollectionConfiguration> Collections { get; set; }
         public List<PropertyConfiguration> Properties { get; set; }
 
@@ -163,6 +166,7 @@ namespace SInnovations.Azure.TableStorageRepository
     }
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
+        private static ILog Logger = LogProvider.GetCurrentClassLogger();
 
         private static Action<TEntityType, IDictionary<string, EntityProperty>, string> EmptyReverseAction = (_, __, ___) => { };
         Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression;
@@ -206,6 +210,19 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             return HasKeys<TPartitionKey, String>(PartitionKeyExpression, null, keylenghts);
         }
+
+        public EntityTypeConfiguration<TEntityType> IgnoreKeyPropertyRemovableFor<PropertyType>(
+            Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder)
+        {
+            if (propertyExpression.Body is MemberExpression)
+            {
+                var memberEx = propertyExpression.Body as MemberExpression;
+                IgnoreKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+            }
+
+            return this;
+        }
+
         public EntityTypeConfiguration<TEntityType> HasKeys<TPartitionKey, TRowKey>(
             Expression<Func<TEntityType, TPartitionKey>> PartitionKeyExpression,
             Expression<Func<TEntityType, TRowKey>> RowKeyExpression, params LengthPadding?[] keylenghts)
@@ -220,11 +237,11 @@ namespace SInnovations.Azure.TableStorageRepository
                 RowKeyMapper = RowKeyExpression == null ? (e) => "" : ConvertToStringKey(RowKeyExpression, out rowKey, lengthQueue)
             };
             if (!string.IsNullOrEmpty(partitionKey))
-                this.NamePairs.Add(partitionKey, "PartitionKey");
+                this.KeyMappings.Add(partitionKey, "PartitionKey");
             if (!string.IsNullOrEmpty(rowKey))
-                this.NamePairs.Add(rowKey, "RowKey");
+                this.KeyMappings.Add(rowKey, "RowKey");
 
-            Trace.TraceInformation("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
+            Logger.DebugFormat("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
 
             Action<TEntityType, IDictionary<string, EntityProperty>, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
             Action<TEntityType, IDictionary<string, EntityProperty>, string> rowAction = RowKeyExpression == null ? (e, d, s) => { } : GetReverseActionFrom<TRowKey>(RowKeyExpression);
@@ -286,9 +303,11 @@ namespace SInnovations.Azure.TableStorageRepository
                 var type = typeof(TEntityType);
                 for (int i = 0; i < newEx.Members.Count && i < parts.Length; ++i)
                 {
+                    
                     //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
                     PropertyInfo property = type.GetProperty(newEx.Members[i].Name);
-
+                    if (IgnoreKeyPropertyRemovables.ContainsKey(newEx.Members[i].Name))
+                        property = null;
 
                     if (i + 1 == newEx.Members.Count && i + 1 < parts.Length)
                         parts[i] = string.Join(TableStorageContext.KeySeparator, parts.Skip(i));
@@ -524,7 +543,7 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             else if (expression.Body is NewExpression)
             {
-                Trace.WriteLine("Using NewExpressino for KeyMapping");
+                Logger.Debug("Using NewExpressino for KeyMapping");
                 var newEx = expression.Body as NewExpression;
                 key = string.Join(TableStorageContext.KeySeparator, newEx.Members.Select(m => m.Name));
                 var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
@@ -540,8 +559,9 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     var obj = func(o);
 
-                    var objs = properties.Select((p, i) => ConvertToString(p.GetValue(obj), GetEncoder(properties[i].Name), lenghtsList[i])
-                    );
+                    var objs = properties.Select((p, i) => ConvertToString( IgnoreKeyPropertyRemovables.ContainsKey(p.Name) ? TypeConvert(IgnoreKeyPropertyRemovables[p.Name],p.GetValue(obj)) :  p.GetValue(obj),                        
+                        GetEncoder(properties[i].Name), lenghtsList[i])
+                    ).ToArray();
 
                     //If any nulls, then the key becomes a enmpty string.
                     //   if (objs.Any(p => p == null))
@@ -558,6 +578,12 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return (a) => "";
 
+        }
+       
+        private string TypeConvert(object p1, object p2)
+        {
+         
+           return (string) ((Delegate)p1).DynamicInvoke(p2);
         }
         private static string ConvertToString(object obj, Func<string, string> encoder = null, LengthPadding? fixedLength = null)
         {

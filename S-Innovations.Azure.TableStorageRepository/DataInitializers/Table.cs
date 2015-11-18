@@ -90,5 +90,10 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
         {
             inits[typeof(T)] = initializer;
         }
+        public static void ClearInitializer<T>()
+        {
+            if(inits.ContainsKey(typeof(T)))
+                inits.Remove(typeof(T));
+        }
     }
 }

@@ -74,7 +74,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
                     new FirstOrDefaultTranslator(configuration),
                     new SingleTranslator(configuration),
                     new SingleOrDefaultTranslator(configuration),
-                    new SelectTranslator(configuration.NamePairs),
+                    new SelectTranslator(configuration.KeyMappings),
                     new TakeTranslator()
                 };
         }

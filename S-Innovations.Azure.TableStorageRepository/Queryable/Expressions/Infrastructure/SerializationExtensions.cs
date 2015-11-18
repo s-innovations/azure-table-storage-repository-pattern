@@ -77,7 +77,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         /// </summary>
         /// <param name="constant">Constant expression.</param>
         /// <returns>Serialized value.</returns>
-        public static string Serialize(this ConstantExpression constant)
+        public static string Serialize(this ConstantExpression constant, bool isKey = false)
         {
             var value = constant.Value;
             if (value == null)
@@ -87,13 +87,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
             // Trying to serialize constant value
             Func<object, string> serializer;
-            if (!Serialization.TryGetValue(constant.Type, out serializer))
+            if (!Serialization.TryGetValue(isKey ? typeof(string): constant.Type, out serializer))
             {
                 string message = String.Format("Resources.SerializationExtensionsNotSupportedType {0}", constant.Type);
                 throw new NotSupportedException(message);
             }
 
-            return serializer(value);
+            return serializer( value);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
+using SInnovations.Azure.TableStorageRepository.Logging;
 using SInnovations.Azure.TableStorageRepository.Queryable.Base;
 using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
@@ -47,6 +48,12 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
     /// <typeparam name="TEntity">Entity type.</typeparam>
     internal class TableQueryProvider<TEntity> : QueryProviderBase, IAsyncQueryProvider
     {
+        /// <summary>
+        /// The logger
+        /// </summary>
+        private readonly static ILog Logger = LogProvider.GetCurrentClassLogger();
+
+
         private readonly TablePocoRepository<TEntity> _repository;
         private readonly EntityTypeConfiguration<TEntity> _entityConfiguration;
         private readonly QueryTranslator _queryTranslator;
@@ -118,6 +125,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         
 
         
+        
 
         /// <summary>
         ///     Executes expression query asynchronously.
@@ -133,13 +141,17 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             {
                 throw new ArgumentNullException("expression");
             }
+            Logger.Debug("Translating Async Expression");
 
             var result = new TranslationResult();
 
             _queryTranslator.Translate(expression, result);
             
             AddCollectionPropertiesFilters(result);
-            
+            Logger.DebugFormat("Executing Async Expression : {0}, {1}, {2}",
+                result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns??Enumerable.Empty<string>()));
+
+        
             return _repository
                 .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)
                 .Then(p => GetProcessedResult(p, result), cancellationToken);

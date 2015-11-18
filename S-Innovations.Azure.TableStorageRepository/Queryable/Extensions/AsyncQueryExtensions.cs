@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -13,6 +14,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
     /// </summary>
     public static class AsyncQueryExtensions
     {
+
+        public static ITableQuery TranslateQuery<T>(this IQueryable<T> source)
+        {
+            var result = (source.Provider as TableQueryProvider<T>).GetTranslationResult(source.Expression);
+
+            return result.TableQuery;
+        }
+
         /// <summary>
         ///     Executes a query ToList method asynchronously.
         /// </summary>

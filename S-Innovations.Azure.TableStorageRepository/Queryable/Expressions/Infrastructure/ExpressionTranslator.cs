@@ -44,7 +44,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         {
             //_nameChanges = nameChanges;
             _configuration = configuration;
-            _nameChanges = configuration.NamePairs;
+            _nameChanges = configuration.KeyMappings;
 
             _constantEvaluator = new ExpressionEvaluator();
         }
@@ -230,7 +230,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             // Left part
             if (leftType == ExpressionType.Call)
             {
-                if (AppendBinaryCall((MethodCallExpression)binary.Left, nodeType,null))
+                if (AppendBinaryCall((MethodCallExpression)binary.Left, nodeType, null, false))
                 {
                     return binary;
                 }
@@ -238,14 +238,15 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
             else
             {
-                AppendBinaryPart(binary.Left, leftType);
+               
+                AppendBinaryPart(binary.Left, leftType, null, false);
             }
 
             // Comparison
             _filter.AppendFormat(" {0} ", nodeType.Serialize());
 
             // Right part
-            AppendRightPart(binary, nodeType, rightType);
+            AppendRightPart(binary, nodeType, rightType, false);
 
             if (paranthesesRequired)
             {
@@ -255,24 +256,30 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             return binary;
         }
 
-        private void AppendRightPart(BinaryExpression binary, ExpressionType nodeType, ExpressionType rightType)
+        private void AppendRightPart(BinaryExpression binary, ExpressionType nodeType, ExpressionType rightType, bool isKey)
         {
             Func<string, string> encoder = null;
+            Delegate valueConverter = null;       
             if (binary.Left.NodeType == ExpressionType.MemberAccess)
             {
                 var name = (binary.Left as MemberExpression).Member.Name;
                 if (_configuration.PropertiesToEncode.ContainsKey(name))
                 {
-                    encoder = _configuration.PropertiesToEncode[name].Encoder;                   
+                    encoder = _configuration.PropertiesToEncode[name].Encoder;
 
                 }
+                if (isKey && _configuration.IgnoreKeyPropertyRemovables.ContainsKey(name))
+                {
+                    valueConverter=((Delegate)_configuration.IgnoreKeyPropertyRemovables[name]);
+                }
+
             }
 
             if (rightType == ExpressionType.Call)
             {
                 var methodCall = (MethodCallExpression)binary.Right;
 
-                if (AppendBinaryCall(methodCall, nodeType, encoder))
+                if (AppendBinaryCall(methodCall, nodeType, encoder, isKey))
                 {
                     string message = String.Format("Resources.TranslatorMethodNotSupported {0}", methodCall.Method.Name);
                     throw new ArgumentException(message);
@@ -280,11 +287,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
             else
             {
-               
-               
-                    AppendBinaryPart(binary.Right, rightType,encoder);
-                
-               
+
+
+
+
+                AppendBinaryPart(binary.Right, rightType, encoder, isKey, valueConverter);
+
+
             }
         }
         int i = 0;
@@ -297,7 +306,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 key = properties;
 
                 keys = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
-                if (keys.Skip(1).Any())
+                if(keys.Any())// (keys.Skip(1).Any())
                 {
 
                     if (keys.Any(k => k == member.Member.Name))
@@ -328,13 +337,16 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     var old = _filter;
                     var startsWithPattern = "";
                     _filter = new StringBuilder();
-                    AppendRightPart(binary, binary.NodeType, binary.Right.NodeType);
+
+                   
+
+                    AppendRightPart(binary, binary.NodeType, binary.Right.NodeType, isKey(_nameChanges[key]));
                     // AppendBinaryPart(binary.Right, binary.Right.NodeType);
                     startsWithPattern = _filter.ToString().Trim('\'');
                     _filter = old;
 
-                    
-                     
+
+
 
                     _keyFilters.Add(new KeyFilter
                     {
@@ -346,6 +358,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         Position = Array.IndexOf(keys, member.Member.Name),
                     });
 
+                    var overrideIsKey = _configuration.IgnoreKeyPropertyRemovables.ContainsKey(member.Member.Name);
+                    if (overrideIsKey)
+                        return false;
                     return true;
                 }
 
@@ -354,7 +369,12 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             return false;
         }
 
-        private void AppendBinaryPart(Expression node, ExpressionType type,Func<string,string> encoder =null)
+        private bool isKey(string p)
+        {
+            return p == "PartitionKey" || p == "RowKey";
+        }
+
+        private void AppendBinaryPart(Expression node, ExpressionType type, Func<string, string> encoder = null, bool isKey = false, Delegate valueConverter=null)
         {
             switch (type)
             {
@@ -366,13 +386,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 case ExpressionType.New:
                 case ExpressionType.NewArrayInit:
                 case ExpressionType.Constant:
-                    AppendConstant(_constantEvaluator.Evaluate(node), encoder);
+                    AppendConstant(_constantEvaluator.Evaluate(node), encoder, isKey);
                     break;
 
                 case ExpressionType.Convert:
                 case ExpressionType.ConvertChecked:
                     var unary = (UnaryExpression)node;
-                    AppendConstant(_constantEvaluator.Evaluate(unary.Operand), encoder);
+                    AppendConstant(_constantEvaluator.Evaluate(unary.Operand), encoder, false);
                     break;
 
                 case ExpressionType.MemberAccess:
@@ -384,7 +404,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     }
                     else
                     {
-                        AppendConstant(node, encoder);
+
+
+                        AppendConstant(node, encoder, isKey, valueConverter);
                     }
                     break;
 
@@ -484,7 +506,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         {
                             AppendParameter(parameter);
                             _filter.Append(equality);
-                            AppendConstant(Expression.Constant(value),null); //Investigate if null is okay
+                            AppendConstant(Expression.Constant(value), null, false); //Investigate if null is okay
                             _filter.Append(" or ");
                             count++;
                         }
@@ -525,7 +547,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 //    break;
 
                 default:
-                    AppendConstant(_constantEvaluator.Evaluate(node),null);
+                    AppendConstant(_constantEvaluator.Evaluate(node), null, false);
                     break;
             }
 
@@ -538,14 +560,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         /// <param name="node">Expression.</param>
         /// <param name="type">Expression type.</param>
         /// <returns>Whether expression has been completely translated.</returns>
-        private bool AppendBinaryCall(MethodCallExpression node, ExpressionType type, Func<string,string> encoder)
+        private bool AppendBinaryCall(MethodCallExpression node, ExpressionType type, Func<string, string> encoder, bool isKey)
         {
             switch (node.Method.Name)
             {
                 case "CompareTo":
                     AppendParameter(_constantEvaluator.Evaluate(node.Object));
                     _filter.AppendFormat(" {0} ", type.Serialize());
-                    AppendConstant(_constantEvaluator.Evaluate(node.Arguments[0]), encoder);
+                    AppendConstant(_constantEvaluator.Evaluate(node.Arguments[0]), encoder, isKey);
                     return true;
 
                 case "Compare":
@@ -554,7 +576,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     {
                         AppendParameter(_constantEvaluator.Evaluate(node.Arguments[0]));
                         _filter.AppendFormat(" {0} ", type.Serialize());
-                        AppendConstant(_constantEvaluator.Evaluate(node.Arguments[1]), encoder);
+                        AppendConstant(_constantEvaluator.Evaluate(node.Arguments[1]), encoder, isKey);
                     }
                     else
                     {
@@ -598,7 +620,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             _filter.Append(name);
         }
 
-        private void AppendConstant(Expression node, Func<string,string> encoder)
+        private void AppendConstant(Expression node, Func<string, string> encoder, bool isKey,Delegate valueconverter = null)
         {
             // Evaluate if required
             if (node.NodeType != ExpressionType.Constant)
@@ -614,12 +636,17 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
 
             var constant = (ConstantExpression)node;
+
+            if (valueconverter != null)
+            {
+                constant = ConstantExpression.Constant(valueconverter.DynamicInvoke(constant.Value));
+            }
             if (encoder != null && constant.Value.GetType() == typeof(string))
             {
                 constant = ConstantExpression.Constant(encoder((string)constant.Value));
-               // constant.Value = (object)encoder((string)constant.Value);
+                // constant.Value = (object)encoder((string)constant.Value);
             }
-            _filter.Append(constant.Serialize());
+            _filter.Append(constant.Serialize(isKey));
         }
     }
 }
