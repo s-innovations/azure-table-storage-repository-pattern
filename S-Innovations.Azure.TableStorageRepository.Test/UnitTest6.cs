@@ -51,7 +51,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
         {
             modelbuilder.Entity<TimeEntity>()
                 .HasKeys( m =>  new { m.Id1, m.Time }, m => m.Id2)
-                .IgnoreKeyPropertyRemovableFor(m =>m.Time,t) 
+                .WithKeyPropertyTransformation(m =>m.Time,t) 
                 .ToTable("test6");
 
 

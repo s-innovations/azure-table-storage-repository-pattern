@@ -211,7 +211,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return HasKeys<TPartitionKey, String>(PartitionKeyExpression, null, keylenghts);
         }
 
-        public EntityTypeConfiguration<TEntityType> IgnoreKeyPropertyRemovableFor<PropertyType>(
+        public EntityTypeConfiguration<TEntityType> WithKeyPropertyTransformation<PropertyType>(
             Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder)
         {
             if (propertyExpression.Body is MemberExpression)
