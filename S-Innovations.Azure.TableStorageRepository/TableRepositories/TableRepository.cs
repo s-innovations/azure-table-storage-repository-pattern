@@ -27,6 +27,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
     }
 
+
+
     public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
     {
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();

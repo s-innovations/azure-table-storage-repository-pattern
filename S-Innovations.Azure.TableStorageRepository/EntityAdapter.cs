@@ -89,6 +89,9 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     var prop = properties[propInfo.PropertyInfo.Name];
                     tasks.Add(propInfo.SetPropertyAsync(this.InnerObject, prop));
+                }else if (propInfo.IsComposite)
+                {
+                    tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, properties.Where(k=>k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k=>k.Key.Substring(propInfo.PropertyInfo.Name.Length+2), v=>v.Value)));
                 }
             }
             Task.WaitAll(tasks.ToArray());
@@ -117,13 +120,22 @@ namespace SInnovations.Azure.TableStorageRepository
                 new
                 {
                     Key = propInfo.PropertyInfo.Name,
-                    Property = await propInfo.GetPropertyAsync(this.InnerObject)
+                    Property = propInfo.IsComposite ? null : await propInfo.GetPropertyAsync(this.InnerObject),
+                    Properties = propInfo.IsComposite ? await propInfo.GetPropertiesAsync(this.InnerObject) : null
                 })).Result;
 
             foreach (var propInfo in all.Where(p => p.Property != null))
             {
                 properties.Add(propInfo.Key, propInfo.Property);
             }
+
+            foreach (var propInfo in all.Where(p => p.Properties != null))
+            {
+                foreach (var prop in propInfo.Properties) {
+                    properties.Add($"{propInfo.Key}__{prop.Key}", prop.Value);
+                }
+            }
+
             if (Properties != null)
             foreach (var propInfo in Properties)
             {

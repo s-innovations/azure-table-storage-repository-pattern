@@ -296,7 +296,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
             }
         }
-        int i = 0;
+     
 
         private bool Is(MemberExpression member, out string key, out string[] keys)
         {
@@ -311,8 +311,6 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
                     if (keys.Any(k => k == member.Member.Name))
                     {
-
-
                         return true;
                     }
 
@@ -324,7 +322,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         }
         private bool IsPartionOrRowKeyNameChange(BinaryExpression binary)
         {
-            i++;
+           
             var left = binary.Left;
 
             if (left.NodeType == ExpressionType.MemberAccess)

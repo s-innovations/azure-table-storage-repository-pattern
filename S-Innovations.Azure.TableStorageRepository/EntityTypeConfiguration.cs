@@ -84,12 +84,23 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         public PropertyInfo PropertyInfo { get; set; }
         public object Deserializer { get; set; }
+
+
         public object Serializer { get; set; }
+
+        public object Composer { get; set; }
+
+        public object Decomposer { get; set; }
+        public bool IsComposite { get; set; }
+
         //public Func<EntityProperty, TProperty> Deserializer { get; set; }
         //public Func<TProperty, EntityProperty> Serializer { get; set; }
 
         public abstract Task SetPropertyAsync(object obj, EntityProperty prop);
+        public abstract Task SetCompositePropertyAsync(object innerObject, IDictionary<string, EntityProperty> properties);
+
         public abstract Task<EntityProperty> GetPropertyAsync(object p);
+        public abstract Task<IDictionary<string,EntityProperty>> GetPropertiesAsync(object p);
     }
     public class PropertyConfiguration<PropertyType> : PropertyConfiguration
     {
@@ -106,6 +117,24 @@ namespace SInnovations.Azure.TableStorageRepository
                 return ((Func<PropertyType, Task<EntityProperty>>)Serializer)((PropertyType)PropertyInfo.GetValue(p));
             return Task.FromResult<EntityProperty>(null);
         }
+        public override Task<IDictionary<string, EntityProperty>> GetPropertiesAsync(object p)
+        {
+            if (IsComposite)
+            {
+                var obj = PropertyInfo.GetValue(p);
+                if (obj != null)
+                    return ((Func<PropertyType, Task<IDictionary<string, EntityProperty>>>)Decomposer)((PropertyType)PropertyInfo.GetValue(p));
+
+            }
+            return Task.FromResult<IDictionary<string, EntityProperty>>(null);
+        }
+
+        public override async Task SetCompositePropertyAsync(object innerObject, IDictionary<string, EntityProperty> properties)
+        {
+            PropertyInfo.SetValue(innerObject, await((Func<IDictionary<string, EntityProperty>, Task<PropertyType>>)Composer)(properties));
+        }
+       
+
     }
 
     public class EncoderPair
@@ -485,6 +514,31 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
 
         }
+
+        public EntityTypeConfiguration<TEntityType> WithPropertyOf<T>(
+          Expression<Func<TEntityType, T>> expression,
+          Func<IDictionary<string, EntityProperty>, Task<T>> composer,
+          Func<T, Task<IDictionary<string, EntityProperty>>> decomposer)
+        {
+            if (expression.Body is MemberExpression)
+            {
+                var memberEx = expression.Body as MemberExpression;
+
+                this.Properties.Add(new PropertyConfiguration<T>
+                {
+                    PropertyInfo = memberEx.Member as PropertyInfo,
+                    IsComposite = true,
+                    Composer = composer,
+                    Decomposer = decomposer,
+
+                });
+            }
+
+            return this;
+
+        }
+
+
 
         //public EntityTypeConfiguration<TEntityType> WithPropertyOf<T>(
         //    Expression<Func<TEntityType, T>> expression,
