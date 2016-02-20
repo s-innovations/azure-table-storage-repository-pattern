@@ -25,7 +25,7 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
                 var table = context.GetTable(configuration.TableName);
                 {
                     table.DeleteIfExists();
-                    var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + "Index").DeleteIfExistsAsync()).ToArray();
+                    var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + index.Value.TableNamePostFix).DeleteIfExistsAsync()).ToArray();
                     Task.WaitAll(tasks);
                 }
 
@@ -35,7 +35,7 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
                     try
                     {
                         context.GetTable(configuration.TableName).CreateIfNotExists();
-                        var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + "Index").CreateIfNotExistsAsync()).ToArray();
+                        var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                         Task.WaitAll(tasks);
                         
                         Logger.Info("Creating was successfull");
@@ -66,7 +66,7 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
             {
                 var configuration = EntityTypeConfigurationsContainer.Configurations[table];
                 context.GetTable(configuration.TableName).CreateIfNotExists();
-                var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + "Index").CreateIfNotExistsAsync()).ToArray();
+                var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName ?? configuration.TableName + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                 Task.WaitAll(tasks);
                     
             }

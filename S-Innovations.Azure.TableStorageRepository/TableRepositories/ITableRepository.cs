@@ -19,6 +19,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         ICollection<TEntity>, 
         IQueryable<TEntity>
     {
+
+        EntityTypeConfiguration<TEntity> Configuration { get; }
+        ITableStorageContext Context { get; }
         /// <summary>
         /// Overrides the modelbuild key selectors.
         /// </summary>

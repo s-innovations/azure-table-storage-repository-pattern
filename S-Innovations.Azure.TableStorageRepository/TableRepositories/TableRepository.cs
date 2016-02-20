@@ -39,11 +39,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         protected EntityTypeConfiguration Configuration { get { return configuration.Value; } }
         protected readonly Lazy<EntityTypeConfiguration> configuration;
-        protected readonly ITableStorageContext context;
+        public ITableStorageContext Context { get; private set; }
 
         internal TableRepository(ITableStorageContext context, Lazy<EntityTypeConfiguration> configuration)
         {
-            this.context = context;
+            this.Context = context;
             this.configuration = configuration;
             this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName));
         }
@@ -88,9 +88,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
         public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
         {
-            foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName ?? Configuration.TableName + "Index"))
+            foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName ?? Configuration.TableName + idx.TableNamePostFix))
             {
-                var table = context.GetTable(index.Key);
+                var table = Context.GetTable(index.Key);
 
                 //TODO Optimize by executing all indexes at the same time and return the first found result.
                 foreach (var idxConfig in index)
@@ -125,7 +125,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             foreach (var collectionInfo in Configuration.Collections)
             {
-                collectionInfo.SetCollection(obj,context);
+                collectionInfo.SetCollection(obj,Context);
             }
             return entity;
         }
@@ -163,9 +163,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                                         {
                                             Config = index,
                                             PartitionKey = indexkey,
-                                            RowKey = "",
+                                            RowKey = index.GetIndexSecondKey(item.Entity),
                                             RefRowKey = item.Entity.RowKey,
                                             RefPartitionKey = item.Entity.PartitionKey,
+                                            Ref = item.Entity
                                         }
                                 });
                             }
@@ -236,9 +237,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             using (new TraceTimer("Handling Indexes"))
             {
-                foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName ?? Configuration.TableName + "Index"))
+                foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName ?? Configuration.TableName + idx.Entity.Config.TableNamePostFix))
                 {
-                    var indexTable = context.GetTable(indexkey.Key);
+                    var indexTable = Context.GetTable(indexkey.Key);
                     foreach (var item in indexkey)
                         block.Post(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>>(indexTable, item));
 
@@ -281,7 +282,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             }
 
             TableOperation opr;
-            switch (this.context.InsertionMode)
+            switch (this.Context.InsertionMode)
             {
                 case InsertionMode.Add:
                     opr = TableOperation.Insert(item);

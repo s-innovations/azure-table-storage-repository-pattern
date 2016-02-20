@@ -24,21 +24,37 @@ namespace SInnovations.Azure.TableStorageRepository
     public abstract class IndexConfiguration
     {
         public string TableName { get; set; }
-
+        public string TableNamePostFix { get; set; } = "Index";
 
         public abstract string GetIndexKey(object entity);
+        public abstract string GetIndexSecondKey(object entity);
+        public bool CopyAllProperties { get; set; }
 
         public Func<object[], string> GetIndexKeyFunc { get; set; }
     }
 
     public class IndexConfiguration<TEntity> : IndexConfiguration
     {
-        public Func<TEntity, string> Finder { get; set; }
+      
+        public Func<TEntity, string> PartitionKeyProvider { get; set; }
+        public Func<TEntity, string> RowKeyProvider { get; set; }
+
         public override string GetIndexKey(object entity)
         {
             if (entity is IEntityAdapter)
-                return Finder((TEntity)((IEntityAdapter)entity).GetInnerObject());
-            return Finder((TEntity)entity);
+                return PartitionKeyProvider((TEntity)((IEntityAdapter)entity).GetInnerObject());
+            return PartitionKeyProvider((TEntity)entity);
+        }
+        public override string GetIndexSecondKey(object entity)
+        {
+            if (RowKeyProvider == null)
+            {
+                return "";
+            }
+
+            if (entity is IEntityAdapter)
+                return RowKeyProvider((TEntity)((IEntityAdapter)entity).GetInnerObject());
+            return RowKeyProvider((TEntity)entity);
         }
     }
 
@@ -178,7 +194,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public void ReverseKeyMapping<TEntity>(EntityAdapter<TEntity> entity)
         {
-            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.Properties, entity.PartitionKey, entity.RowKey);
+            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.Properties, entity.Properties["RefPartitionKey"]?.StringValue ?? entity.PartitionKey, entity.Properties["RefRowKey"]?.StringValue ?? entity.RowKey);
         }
 
 
@@ -390,8 +406,8 @@ namespace SInnovations.Azure.TableStorageRepository
             var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key);
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
-                Finder = entityToKeyProperty,
-                TableName = TableName ?? (string.IsNullOrWhiteSpace(this.TableName) ? null : this.TableName + "Index"),
+                PartitionKeyProvider = entityToKeyProperty,
+                TableName = TableName ?? (string.IsNullOrWhiteSpace(this.TableName) ? null : this.TableName + "Index"),            
                 GetIndexKeyFunc = (objs) =>
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
@@ -579,7 +595,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             this.TableName = tableName;
             foreach (var index in Indexes.Where(i => string.IsNullOrWhiteSpace(i.Value.TableName)))
-                index.Value.TableName = this.TableName + "Index";
+                index.Value.TableName = this.TableName + index.Value.TableNamePostFix;
 
             return this;
         }

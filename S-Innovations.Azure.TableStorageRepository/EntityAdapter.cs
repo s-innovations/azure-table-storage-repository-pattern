@@ -15,11 +15,34 @@ namespace SInnovations.Azure.TableStorageRepository
 
         [IgnoreProperty]
         public IndexConfiguration Config { get; set; }
+
+        [IgnoreProperty]
+        public ITableEntity Ref { get; set; }
+
+        public override void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+        {
+            base.ReadEntity(properties, operationContext);
+        }
+        public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
+        {
+            if(Config.CopyAllProperties && Ref is IEntityAdapter)
+            {
+                var adapter = Ref as IEntityAdapter;
+                var baseProps = base.WriteEntity(operationContext);
+                var props= baseProps.Concat(adapter.WrittenProperties.Where(k => !(k.Key == "PartitionKey" || k.Key == "RowKey")))
+                    .ToDictionary(k => k.Key, v => v.Value);
+                return props;
+            }
+
+            return base.WriteEntity(operationContext);
+        }
+
     }
     public interface IEntityAdapter
     {
         object GetInnerObject();
         IDictionary<string, EntityProperty> Properties { get; }
+        IDictionary<string,EntityProperty> WrittenProperties { get; }
     }
     public interface IEntityAdapter<T> : IEntityAdapter
     {
@@ -98,7 +121,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
             //Set the properties
             Properties = properties;
-
+            
             //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
             config.ReverseKeyMapping(this);
 
@@ -113,7 +136,7 @@ namespace SInnovations.Azure.TableStorageRepository
             }
 
             
-            IDictionary<string, EntityProperty>  properties = TableEntity.WriteUserObject(this.InnerObject, operationContext);
+            WrittenProperties = TableEntity.WriteUserObject(this.InnerObject, operationContext);
             
             var all = Task.WhenAll(config.Properties
             .Select(async propInfo =>
@@ -126,32 +149,32 @@ namespace SInnovations.Azure.TableStorageRepository
 
             foreach (var propInfo in all.Where(p => p.Property != null))
             {
-                properties.Add(propInfo.Key, propInfo.Property);
+                WrittenProperties.Add(propInfo.Key, propInfo.Property);
             }
 
             foreach (var propInfo in all.Where(p => p.Properties != null))
             {
                 foreach (var prop in propInfo.Properties) {
-                    properties.Add($"{propInfo.Key}__{prop.Key}", prop.Value);
+                    WrittenProperties.Add($"{propInfo.Key}__{prop.Key}", prop.Value);
                 }
             }
 
             if (Properties != null)
             foreach (var propInfo in Properties)
             {
-                if (!properties.ContainsKey(propInfo.Key))
-                    properties.Add(propInfo.Key, propInfo.Value);
+                if (!WrittenProperties.ContainsKey(propInfo.Key))
+                        WrittenProperties.Add(propInfo.Key, propInfo.Value);
             }
 
             //Remove those parts that is used for partition/row keys. (redundant data)
             var keyprops = config.KeyMappings.Keys.SelectMany(k => k.Split(new string[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries));
             foreach (var key in keyprops.Where(n=>!config.IgnoreKeyPropertyRemovables.ContainsKey(n)))
-                properties.Remove(key);
+                WrittenProperties.Remove(key);
 
 
-            EnsureSizeLimites(properties);
+            EnsureSizeLimites(WrittenProperties);
 
-            return properties;
+            return WrittenProperties;
         }
 
         private void EnsureSizeLimites(IDictionary<string, EntityProperty> properties)
@@ -180,5 +203,6 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public virtual IDictionary<string, EntityProperty> Properties { get; set; }
 
+        public IDictionary<string, EntityProperty> WrittenProperties { get; set; }
     }
 }
