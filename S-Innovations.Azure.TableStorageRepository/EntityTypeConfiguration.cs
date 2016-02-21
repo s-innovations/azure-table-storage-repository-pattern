@@ -164,6 +164,7 @@ namespace SInnovations.Azure.TableStorageRepository
         // protected readonly TableStorageModelBuilder builder;
         public ConcurrentDictionary<long, Tuple<DateTimeOffset, string>> EntityStates { get; set; }
 
+        public bool TraceOnAdd { get; set; }
 
         public EntityTypeConfiguration()
         {

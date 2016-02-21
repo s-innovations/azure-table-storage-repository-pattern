@@ -20,6 +20,8 @@ namespace SInnovations.Azure.TableStorageRepository
         InsertionMode InsertionMode { get; set; }
         CloudTable GetTable(string name);
         CloudStorageAccount StorageAccount { get; }
+
+        int MaxDegreeOfParallelism { get; }
     }
     public enum EntityState
     {

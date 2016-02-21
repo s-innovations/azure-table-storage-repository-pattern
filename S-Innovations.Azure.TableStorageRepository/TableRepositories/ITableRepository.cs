@@ -20,6 +20,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         IQueryable<TEntity>
     {
 
+    
         EntityTypeConfiguration<TEntity> Configuration { get; }
         ITableStorageContext Context { get; }
         /// <summary>

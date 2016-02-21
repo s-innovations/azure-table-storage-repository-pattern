@@ -60,6 +60,7 @@ namespace SInnovations.Azure.TableStorageRepository
    }
     public abstract class TableStorageContext : ITableStorageContext
     {
+        public int MaxDegreeOfParallelism { get; set; } = 10;
         public CloudStorageAccount StorageAccount {get; private set;}
         private static object _buildLock = new object();
        

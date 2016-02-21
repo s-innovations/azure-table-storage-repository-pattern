@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SInnovations.Azure.TableStorageRepository.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -12,6 +13,8 @@ namespace SInnovations.Azure.TableStorageRepository
     /// </summary>
     public class TraceTimer : IDisposable
     {
+        private ILog Logger = LogProvider.GetCurrentClassLogger();
+
         /// <summary>
         /// Set the TraceLevel that should be written to, default is verbose.
         /// </summary>
@@ -54,16 +57,20 @@ namespace SInnovations.Azure.TableStorageRepository
                 switch (TraceLevel)
                 {
                     case TraceLevel.Error:
-                        Trace.TraceError(TraceString(_action));
+                        Logger.Error(TraceString(_action));
+                       // Trace.TraceError(TraceString(_action));
                         break;
                     case TraceLevel.Info:
-                        Trace.TraceInformation(TraceString(_action));
+                        Logger.Info(TraceString(_action));
+                    //    Trace.TraceInformation(TraceString(_action));
                         break;
                     case TraceLevel.Warning:
-                        Trace.TraceWarning(TraceString(_action));
+                        Logger.Warn(TraceString(_action));
+                       // Trace.TraceWarning(TraceString(_action));
                         break;
                     default:
-                        Trace.WriteLine(TraceString(_action), "Verbose");
+                        Logger.Trace(TraceString(_action));
+                   //     Trace.WriteLine(TraceString(_action), "Verbose");
                         break;
                 }
 

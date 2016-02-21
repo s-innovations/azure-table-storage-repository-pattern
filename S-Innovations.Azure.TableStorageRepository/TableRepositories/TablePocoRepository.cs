@@ -21,13 +21,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            ITableRepository<TEntity>
     {
         private readonly Expression _expression;
-        //protected new readonly EntityTypeConfiguration<TEntity> configuration;
         public new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
         public TablePocoRepository(ITableStorageContext context, Lazy<EntityTypeConfiguration<TEntity>> configuration)
             : base(context, new Lazy<EntityTypeConfiguration>(() => configuration.Value))
         {
-           // this.configuration = configuration;
+
             _expression = Expression.Constant(this);
             _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(this, configuration.Value));
         }
@@ -35,12 +34,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             return Table.CreateQuery<T>();            
         }
-        //public CloudTable Table
-        //{
-        //    get { return table; }
-        //}
 
-        //protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity)
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
         {
             if (entity == null)

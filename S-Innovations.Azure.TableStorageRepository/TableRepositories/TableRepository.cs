@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using SInnovations.Azure.TableStorageRepository.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
@@ -31,13 +32,16 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
     public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
     {
+        private ILog Logger = LogProvider.GetCurrentClassLogger();
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
+        
 
         public CloudTable Table { get { return table.Value; } }
         protected Lazy<CloudTable> table;
 
         protected EntityTypeConfiguration Configuration { get { return configuration.Value; } }
+
         protected readonly Lazy<EntityTypeConfiguration> configuration;
         public ITableStorageContext Context { get; private set; }
 
@@ -55,10 +59,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public virtual void Add(TEntity entity)
         {
+            if (Configuration.TraceOnAdd && Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository"); }
+           
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity });
         }
         public virtual void Add(TEntity entity,string partitionkey, string rowkey)
         {
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository using partitionkey:{partitionkey},rowkey:{rowkey}"); }
+
             entity.PartitionKey = partitionkey;
             entity.RowKey = rowkey;
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity, KeysLocked=true });
@@ -66,28 +74,37 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public void Delete(TEntity entity)
         {
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Deleting entity<{entity.GetHashCode()} to TableRepository"); }
+
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Deleted, Entity = entity });
 
         }
         public void Update(TEntity entity)
         {
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Updating entity<{entity.GetHashCode()} to TableRepository"); }
+
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Updated, Entity = entity });
 
         }
 
 
-        public virtual async Task<TEntity> FindByKeysAsync(string partitionkey, string rowkey)
+        public virtual async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
         {
-            var op = TableOperation.Retrieve<TEntity>(partitionkey, rowkey);
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
+            var op = TableOperation.Retrieve<TEntity>(partitionKey, rowKey);
             var result = await Table.ExecuteAsync(op);          
             return SetCollections((TEntity)result.Result);
         }
         public Task DeleteByKey(string partitionKey, string rowKey)
         {
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Deleting entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
+
             return Table.ExecuteAsync(TableOperation.Delete(new TableEntity(partitionKey, rowKey) { ETag = "*" }));
         }
         public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
         {
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding by index keys {string.Join(",", keys)}"); }
+
             foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName ?? Configuration.TableName + idx.TableNamePostFix))
             {
                 var table = Context.GetTable(index.Key);
@@ -132,19 +149,23 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public async Task SaveChangesAsync()
         {
-            if (!_cache.Any())
-                return;
-          //  await table.CreateIfNotExistsAsync();
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"SaveChangesAsync Running"); }
 
+            if (!_cache.Any())
+            {
+                if (Logger.IsTraceEnabled()) { Logger.Trace($"SaveChangesAsync had empty cache"); }
+                return;
+            }
+    
             var indexes = new ConcurrentBag<EntityStateWrapper<IndexEntity>>();
 
             var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
             {
+                if (Logger.IsTraceEnabled()) { Logger.Trace($"Executing ActionBlock of batch size {batch.Length}"); }
+
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
                 {
-                  //  Trace.WriteLine(string.Format("Batch<{0}> item<{3}>: {1} {2}", 
-                  //      batch.GetHashCode(),item.Entity.PartitionKey,item.Entity.RowKey,item.State));
                     
                     switch (item.State)
                     {
@@ -155,6 +176,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                                 var indexkey = index.GetIndexKey(item.Entity);
                                 if (indexkey == null)
                                     continue;
+
                                 indexes.Add(new EntityStateWrapper<IndexEntity>
                                 {
                                     State = EntityState.Added,
@@ -188,17 +210,23 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     }
 
                 }
-                using (new TraceTimer(string.Format("Executing Batch length {0} to {1}", batchOpr.Count,Table.Name)))
-                {
 
-                    //table.ExecuteBatch(batchOpr);
-                    if (batchOpr.Count == 1)
-                        await Table.ExecuteAsync(batchOpr.First());
-                    else
-                        await Table.ExecuteBatchAsync(batchOpr);
+                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count,Table.Name)))
+                {
+                    try {
+                        //table.ExecuteBatch(batchOpr);
+                        if (batchOpr.Count == 1)
+                            await Table.ExecuteAsync(batchOpr.First());
+                        else
+                            await Table.ExecuteBatchAsync(batchOpr);
+                    }catch(Exception ex)
+                    {
+                        Logger.TraceException("Error execution", ex);
+                        throw;
+                    }
                 }
 
-            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = ExecutionDataflowBlockOptions.Unbounded });
+            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
 
             using (new TraceTimer("Handling Entities"))
             {
@@ -210,38 +238,79 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                           .Select(x => x.Select(v => v.Group).ToArray())
                           .Select(t => t.ToArray()))
                     {
-                        Trace.WriteLine(string.Format("Posting Batch of lenght: {0}", batch.Length));
-                        actionblock.Post(batch);
+                        Logger.Trace($"Posting Batch of lenght: {batch.Length}");
+                        await actionblock.SendAsync(batch);
                     }
+
                 actionblock.Complete();
                 await actionblock.Completion;
             }
-            var block = new ActionBlock<Tuple<CloudTable, EntityStateWrapper<IndexEntity>>>(async (item) =>
+
+            var block = new ActionBlock<Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>>(async (tuple) =>
             {
-                switch (item.Item2.State)
+                var batch = tuple.Item2;
+                var table = tuple.Item1;
+                if (Logger.IsTraceEnabled()) { Logger.Trace($"Executing Index ActionBlock of batch size {batch.Length}"); }
+
+                var batchOpr = new TableBatchOperation();
+                foreach (var item in batch)
                 {
-                    case EntityState.Added:
-                        await item.Item1.ExecuteAsync(GetInsertionOperation(item.Item2.Entity));
-                        break;
-                    case EntityState.Updated:
-                        await item.Item1.ExecuteAsync(TableOperation.Merge(item.Item2.Entity));
-                        break;
-                    case EntityState.Deleted:
-                        await item.Item1.ExecuteAsync(TableOperation.Delete(item.Item2.Entity));
-                        break;
-                    default:
-                        break;
+
+                    switch (item.State)
+                    {
+                        case EntityState.Added:
+                            batchOpr.Add(GetInsertionOperation(item.Entity));
+                            //await item.Item1.ExecuteAsync(GetInsertionOperation(item.Item2.Entity));
+                            break;
+                        case EntityState.Updated:
+                            batchOpr.Add(TableOperation.Merge(item.Entity));
+                            //await item.Item1.ExecuteAsync(TableOperation.Merge(item.Item2.Entity));
+                            break;
+                        case EntityState.Deleted:
+                            batchOpr.Add(TableOperation.Delete(item.Entity));
+                            //await item.Item1.ExecuteAsync(TableOperation.Delete(item.Item2.Entity));
+                            break;
+                        default:
+                            break;
+                    }
                 }
 
-            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = ExecutionDataflowBlockOptions.Unbounded });
+                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count, table.Name)))
+                {
+                    try
+                    {
+                        //table.ExecuteBatch(batchOpr);
+                        if (batchOpr.Count == 1)
+                            await table.ExecuteAsync(batchOpr.First());
+                        else
+                            await table.ExecuteBatchAsync(batchOpr);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.TraceException("Error execution", ex);
+                        throw;
+                    }
+                }
+
+            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
 
             using (new TraceTimer("Handling Indexes"))
             {
                 foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName ?? Configuration.TableName + idx.Entity.Config.TableNamePostFix))
                 {
                     var indexTable = Context.GetTable(indexkey.Key);
-                    foreach (var item in indexkey)
-                        block.Post(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>>(indexTable, item));
+                    var batches = indexkey.GroupBy(k => k.Entity.PartitionKey);
+                    foreach (var group in batches)
+                        foreach (var batch in group
+                          .Select((x, i) => new { Group = x, Index = i })
+                          .GroupBy(x => x.Index / 100)
+                          .Select(x => x.Select(v => v.Group).ToArray())
+                          .Select(t => t.ToArray()))
+                        {
+                            Logger.Trace($"Posting Batch of lenght: {batch.Length}");
+                            await block.SendAsync(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>(indexTable, batch));
+                        }
+
 
                 }
                 block.Complete();
@@ -270,6 +339,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             entity.PartitionKey = mapper.PartitionKeyMapper(entity);
             entity.RowKey = mapper.RowKeyMapper(entity);
+            if (Logger.IsTraceEnabled()) { Logger.Trace($"Setting Keys for Entity<{entity.GetHashCode()}>[{entity.PartitionKey}|{entity.RowKey}]"); }
             return entity;
         }
 
