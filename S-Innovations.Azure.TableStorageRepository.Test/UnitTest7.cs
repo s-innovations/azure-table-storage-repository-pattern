@@ -100,6 +100,16 @@ namespace SInnovations.Azure.TableStorageRepository.Test
 
             return extent;
         }
+
+        public bool SplitByExtent(TestEntity entity, double[] extentTest)
+        {
+            return false;
+        }
+
+        public bool SplitByExtent(JObject entity, double[] extentTest)
+        {
+            return false;
+        }
     }
 
     [TestClass]
@@ -109,6 +119,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
       //  [TestMethod]
         public async Task TestMethod5()
         {
+            var tilesystem = new TileSystem();
             var a = new Test7Context(CloudStorageAccount.DevelopmentStorageAccount);
 
             foreach (var z in Enumerable.Range(0, 5)) {
@@ -117,7 +128,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
                     {
                         var input = new TestEntity
                         {
-                            Id = TileSystem.TileXYToQuadKey(x,y,z).PadRight(10,'_'),
+                            Id = tilesystem.TileXYToQuadKey(x,y,z).PadRight(10,'_'),
                           //  Id2 = new string(TileSystem.TileXYToQuadKey(x, y, z).Reverse().ToArray()).PadRight(10, '_'),
                             Geometry = new JObject(
                             new JProperty("type", "Polygon"),

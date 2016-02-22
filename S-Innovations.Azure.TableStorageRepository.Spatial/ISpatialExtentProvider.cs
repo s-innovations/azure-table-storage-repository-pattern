@@ -14,6 +14,7 @@ namespace SInnovations.Azure.TableStorageRepository.Spatial
         /// <param name="entity"></param>
         /// <returns></returns>
         double[] GetExtent(TEntityType entity);
+        bool SplitByExtent(TEntityType entity, double[] extentTest);
     }
 
     public interface ISpatialIntersectService<TEntityType,TTargetEntityType>

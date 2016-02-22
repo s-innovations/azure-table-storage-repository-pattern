@@ -173,24 +173,27 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
                             foreach (var index in Configuration.Indexes.Values)
                             {
-                                var indexkey = index.GetIndexKey(item.Entity);
-                                if (indexkey == null)
+                                var indexkeys = index.GetIndexKey(item.Entity);
+                                if (indexkeys == null)
                                     continue;
 
-                                indexes.Add(new EntityStateWrapper<IndexEntity>
+                                foreach (var indexkey in indexkeys)
                                 {
-                                    State = EntityState.Added,
-                                    Entity =
-                                        new IndexEntity
-                                        {
-                                            Config = index,
-                                            PartitionKey = indexkey,
-                                            RowKey = index.GetIndexSecondKey(item.Entity),
-                                            RefRowKey = item.Entity.RowKey,
-                                            RefPartitionKey = item.Entity.PartitionKey,
-                                            Ref = item.Entity
-                                        }
-                                });
+                                    indexes.Add(new EntityStateWrapper<IndexEntity>
+                                    {
+                                        State = EntityState.Added,
+                                        Entity =
+                                            new IndexEntity
+                                            {
+                                                Config = index,
+                                                PartitionKey = indexkey,
+                                                RowKey = index.GetIndexSecondKey(item.Entity),
+                                                RefRowKey = item.Entity.RowKey,
+                                                RefPartitionKey = item.Entity.PartitionKey,
+                                                Ref = item.Entity
+                                            }
+                                    });
+                                }
                             }
                             batchOpr.Add(GetInsertionOperation(item.Entity));
                             break;

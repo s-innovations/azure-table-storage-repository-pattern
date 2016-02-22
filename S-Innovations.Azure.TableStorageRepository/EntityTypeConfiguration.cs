@@ -26,7 +26,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public string TableName { get; set; }
         public string TableNamePostFix { get; set; } = "Index";
 
-        public abstract string GetIndexKey(object entity);
+        public abstract string[] GetIndexKey(object entity);
         public abstract string GetIndexSecondKey(object entity);
         public bool CopyAllProperties { get; set; }
 
@@ -35,15 +35,20 @@ namespace SInnovations.Azure.TableStorageRepository
 
     public class IndexConfiguration<TEntity> : IndexConfiguration
     {
-      
+        public Func<TEntity, string[]> PartitionSplitKeyProvider { get; set; }
         public Func<TEntity, string> PartitionKeyProvider { get; set; }
         public Func<TEntity, string> RowKeyProvider { get; set; }
 
-        public override string GetIndexKey(object entity)
+        public override string[] GetIndexKey(object entity)
         {
-            if (entity is IEntityAdapter)
-                return PartitionKeyProvider((TEntity)((IEntityAdapter)entity).GetInnerObject());
-            return PartitionKeyProvider((TEntity)entity);
+            TEntity data = entity is IEntityAdapter ? (TEntity)((IEntityAdapter)entity).GetInnerObject() : (TEntity)entity;
+
+            if(PartitionSplitKeyProvider != null)
+            {
+                return PartitionSplitKeyProvider(data);
+            }
+           
+            return new[] { PartitionKeyProvider(data) };
         }
         public override string GetIndexSecondKey(object entity)
         {
