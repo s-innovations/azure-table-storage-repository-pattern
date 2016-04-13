@@ -30,8 +30,11 @@ namespace SInnovations.Azure.TableStorageRepository.Spatial.DotSpatial
         {
             var a = await EntityReader(entity);
             var b = await TestReader(testEntity);
+            var geomA = a.ToObject<IGeometry>(serialier);
+            var geomB = b.ToObject<IGeometry>(serialier);
+            return geomA.Intersects(geomB);
 
-            return a.ToObject<Polygon>(serialier).Intersects(b.ToObject<Polygon>(serialier));
+       //     return a.ToObject<Polygon>(serialier).Intersects(b.ToObject<Polygon>(serialier));
 
         }
     }
