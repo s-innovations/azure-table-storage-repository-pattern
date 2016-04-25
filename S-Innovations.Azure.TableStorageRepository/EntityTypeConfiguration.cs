@@ -200,7 +200,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public void ReverseKeyMapping<TEntity>(EntityAdapter<TEntity> entity)
         {
-            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.Properties, entity.Properties["RefPartitionKey"]?.StringValue ?? entity.PartitionKey, entity.Properties["RefRowKey"]?.StringValue ?? entity.RowKey);
+            ((KeysMapper<TEntity>)KeyMapper).ReverseKeysMapper(entity.InnerObject, entity.Properties, entity.Properties.ContainsKey("RefPartitionKey")? entity.Properties["RefPartitionKey"]?.StringValue : entity.PartitionKey, entity.Properties.ContainsKey("RefRowKey") ? entity.Properties["RefRowKey"]?.StringValue : entity.RowKey);
         }
 
 

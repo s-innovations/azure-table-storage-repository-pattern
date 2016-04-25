@@ -32,9 +32,33 @@ namespace SInnovations.Azure.TableStorageRepository.Spatial.DotSpatial
             var b = await TestReader(testEntity);
             var geomA = a.ToObject<IGeometry>(serialier);
             var geomB = b.ToObject<IGeometry>(serialier);
-            return geomA.Intersects(geomB);
+    
+            return Intersects(geomA, geomB);
+            //     return a.ToObject<Polygon>(serialier).Intersects(b.ToObject<Polygon>(serialier));
 
-       //     return a.ToObject<Polygon>(serialier).Intersects(b.ToObject<Polygon>(serialier));
+        }
+
+        private static bool Intersects(IGeometry A, IGeometry B)
+        {
+            var AGeoms = A as GeometryCollection;
+            if (AGeoms != null)
+            {
+                foreach (var AGeom in AGeoms.Geometries)
+                {
+                    if (Intersects(AGeom, B))
+                        return true;
+                }
+
+            }
+
+            if (B is GeometryCollection)
+            {
+                return Intersects(B, A);
+            }
+
+
+
+            return (B.Intersects(A));
 
         }
     }
