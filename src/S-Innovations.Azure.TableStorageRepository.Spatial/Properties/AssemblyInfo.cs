@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("S-Innovations.Azure.TableStorageRepository.Spatial")]
 [assembly: AssemblyDescription("A spatial indexing for azure table storage")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("S-Innovations /v Poul Kjeldager Sørensen")]
+[assembly: AssemblyCompany("S-Innovations v/Poul K. Sørensen")]
 [assembly: AssemblyProduct("S-Innovations.Azure.TableStorageRepository.Spatial")]
 [assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]

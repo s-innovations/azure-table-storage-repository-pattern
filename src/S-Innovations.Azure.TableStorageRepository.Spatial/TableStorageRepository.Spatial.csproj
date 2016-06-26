@@ -73,15 +73,15 @@
     <Compile Include="SpatialExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
+    <None Include="packages.config" />
+    <None Include="TableStorageRepository.Spatial.nuspec" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\S-Innovations.Azure.TableStorageRepository\TableStorageRepository.csproj">
       <Project>{6b91bf5b-d535-47ff-99a4-877d53662b5f}</Project>
       <Name>TableStorageRepository</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
-    <None Include="TableStorageRepository.Spatial.nuspec" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
