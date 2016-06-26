@@ -10,6 +10,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
+using SInnovations.Azure.TableStorageRepository;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
