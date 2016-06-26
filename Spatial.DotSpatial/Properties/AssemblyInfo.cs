@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("S-Innovations.Azure.TableStorageRepository.Spatial.DotSpatial")]
 [assembly: AssemblyDescription("A DotSpatial implementation of intersecting and geojson converters")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("S-Innovations /v Poul Kjeldager Sørensen")]
+[assembly: AssemblyCompany("S-Innovations v/Poul K. Sørensen")]
 [assembly: AssemblyProduct("S-Innovations.Azure.TableStorageRepository.Spatial.DotSpatial")]
 [assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]

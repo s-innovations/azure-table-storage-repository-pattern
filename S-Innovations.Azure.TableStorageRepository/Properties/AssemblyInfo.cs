@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("S-Innovations.Azure.TableStorageRepository")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("A TableStorage Respository Pattern with support for revision tracking")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("S-Innovations")]
+[assembly: AssemblyCompany("S-Innovations v/Poul K. Sørensen")]
 [assembly: AssemblyProduct("S-Innovations.Azure.TableStorageRepository")]
 [assembly: AssemblyCopyright("Copyright ©  2014")]
 [assembly: AssemblyTrademark("")]

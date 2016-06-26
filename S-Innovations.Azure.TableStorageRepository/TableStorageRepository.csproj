@@ -121,6 +121,7 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
+    <None Include="TableStorageRespository.nuspec" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Queryable\License.txt" />
