@@ -12,6 +12,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -123,8 +124,10 @@ namespace SInnovations.Azure.TableStorageRepository
         public abstract Task<EntityProperty> GetPropertyAsync(object p);
         public abstract Task<IDictionary<string,EntityProperty>> GetPropertiesAsync(object p);
     }
-    public class PropertyConfiguration<PropertyType> : PropertyConfiguration
+    public class PropertyConfiguration<TEntity,PropertyType> : PropertyConfiguration
     {
+        public bool IsEntityComposed { get; internal set; }
+
         public override async Task SetPropertyAsync(object obj, EntityProperty prop)
         {
             PropertyInfo.SetValue(obj, await ((Func<EntityProperty, Task<PropertyType>>)Deserializer)(prop));
@@ -152,7 +155,17 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public override async Task SetCompositePropertyAsync(object innerObject, IDictionary<string, EntityProperty> properties)
         {
-            PropertyInfo.SetValue(innerObject, await((Func<IDictionary<string, EntityProperty>, Task<PropertyType>>)Composer)(properties));
+            if (IsEntityComposed)
+            {
+         
+             
+               var method = (Func <TEntity, IDictionary< string, EntityProperty >, Task < PropertyType >> )Composer;
+                PropertyInfo.SetValue(innerObject, await method((TEntity)innerObject, properties));
+            }
+            else
+            {
+                PropertyInfo.SetValue(innerObject, await ((Func<IDictionary<string, EntityProperty>, Task<PropertyType>>)Composer)(properties));
+            }
         }
        
 
@@ -168,6 +181,8 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         // protected readonly TableStorageModelBuilder builder;
         public ConcurrentDictionary<long, Tuple<DateTimeOffset, string>> EntityStates { get; set; }
+
+        public ReversionTrackingOptions ReversionTracking { get; set; } = new ReversionTrackingOptions();
 
         public bool TraceOnAdd { get; set; }
 
@@ -215,6 +230,19 @@ namespace SInnovations.Azure.TableStorageRepository
         public int Length { get; set; }
         public PaddingDirection Direction { get; set; }
     }
+
+    public class ReversionTrackingOptions
+    {
+        public bool Enabled { get; set; }
+     //   public delegate ITableQuery FilterDelegate<T>(ITableRepository<T> table, T entity);
+        public Delegate HeadWhereFilter { get; set; }
+   //     public Delegate UpdateReversion { get; set; }
+
+      //  public object OnEntityChanged { get; set; }
+         
+        //    public object CreateReversion { get; set; }
+
+    }
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
         private static ILog Logger = LogProvider.GetCurrentClassLogger();
@@ -241,7 +269,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 return Activator.CreateInstance<TEntityType>();
             return (TEntityType)Activator.CreateInstance(typeof(TEntityType), ArgumentsExpression(properties));
         }
-        public EntityTypeConfiguration<TEntityType> WithNoneDefaultConstructor(
+        public EntityTypeConfiguration<TEntityType> WithConstructorArguments(
             Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression)
         {
             this.ArgumentsExpression = ArgumentsExpression;
@@ -366,21 +394,21 @@ namespace SInnovations.Azure.TableStorageRepository
                     if (PropertiesToEncode.Keys.Contains(newEx.Members[i].Name))
                         parts[i] = PropertiesToEncode[newEx.Members[i].Name].Decoder(parts[i]);//.Base64Decode();
 
-                    if (property != null)
+                    if (property != null && property.SetMethod != null)
                     {
                         EntityProperty prop = null;
                         var value = StringTo(property.PropertyType, parts[i], out prop);
 
 
-                        if (property.SetMethod == null)
-                            throw new Exception(string.Format("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}\n\n When using Composite Keys, do m => new {m.PropertyName0,m.PropertyName1}, and only int,long,guid,string properties are supported at this point.", property.Name, property.PropertyType, partitionkey, newEx));
+                       // if ( property.SetMethod == null)
+                       //     throw new Exception(string.Format("SetMethod was null: {1} {0} {{get;set;}}\n {2} \n {3}\n\n When using Composite Keys, do m => new {{m.PropertyName0,m.PropertyName1}}, and only int,long,guid,string properties are supported at this point.", property.Name, property.PropertyType, partitionkey, newEx));
 
 
                         if (property.SetMethod != null)
                             property.SetValue(obj, value);
 
-                        if (prop != null)
-                            dict[property.Name] = prop;
+                      //  if (prop != null)
+                      //      dict[property.Name] = prop;
                     }
                 }
 
@@ -476,7 +504,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             foreach (var prop in typeof(TEntityType).GetProperties().Where(p => p.PropertyType == typeof(Uri)))
             {
-                this.Properties.Add(new PropertyConfiguration<Uri>
+                this.Properties.Add(new PropertyConfiguration<TEntityType,Uri>
                 {
                     PropertyInfo = prop,
                     Serializer = (Func<Uri, Task<EntityProperty>>)UriSerializer,
@@ -498,13 +526,23 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private static PropertyConfiguration PropertyConfigurationFactory<T>()
         {
-            return new PropertyConfiguration<T>()
+            return new PropertyConfiguration<TEntityType, T>()
                 {
                     Deserializer = (Func<EntityProperty, Task<T>>)((property) => Task.FromResult(JsonConvert.DeserializeObject<T>(property.StringValue))),
                     Serializer = (Func<T, Task<EntityProperty>>)(p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p))))
                 };
         }
 
+
+      
+        public EntityTypeConfiguration<TEntityType> WithReversionTracking(Func<ITableRepository<TEntityType>,TEntityType,ITableQuery> headFilter)
+        {
+            this.ReversionTracking.Enabled = true;
+            ReversionTracking.HeadWhereFilter = headFilter;
+          //  ReversionTracking.OnEntityChanged = onEntityChanged;
+ 
+            return this;
+        }
 
         /// <summary>
         /// Configure a custom property with custom serializer/deserializer
@@ -523,7 +561,7 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 var memberEx = expression.Body as MemberExpression;
 
-                this.Properties.Add(new PropertyConfiguration<T>
+                this.Properties.Add(new PropertyConfiguration<TEntityType,T>
                 {
                     PropertyInfo = memberEx.Member as PropertyInfo,
                     // EntityType = typeof(T),
@@ -546,7 +584,7 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 var memberEx = expression.Body as MemberExpression;
 
-                this.Properties.Add(new PropertyConfiguration<T>
+                this.Properties.Add(new PropertyConfiguration<TEntityType,T>
                 {
                     PropertyInfo = memberEx.Member as PropertyInfo,
                     IsComposite = true,
@@ -559,7 +597,29 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
 
         }
+        public EntityTypeConfiguration<TEntityType> WithPropertyOf<T>(
+        Expression<Func<TEntityType, T>> expression,
+        Func<TEntityType,IDictionary<string, EntityProperty>, Task<T>> composer,
+        Func<T, Task<IDictionary<string, EntityProperty>>> decomposer)
+        {
+            if (expression.Body is MemberExpression)
+            {
+                var memberEx = expression.Body as MemberExpression;
 
+                this.Properties.Add(new PropertyConfiguration<TEntityType,T>
+                {
+                    PropertyInfo = memberEx.Member as PropertyInfo,
+                    IsComposite = true,
+                    IsEntityComposed = true,
+                    Composer = composer,
+                    Decomposer = decomposer,
+
+                });
+            }
+
+            return this;
+
+        }
 
 
         //public EntityTypeConfiguration<TEntityType> WithPropertyOf<T>(
@@ -635,10 +695,13 @@ namespace SInnovations.Azure.TableStorageRepository
 
                     var obj = func(o);
 
+                   
+
                     var objs = properties.Select((p, i) => ConvertToString( IgnoreKeyPropertyRemovables.ContainsKey(p.Name) ? TypeConvert(IgnoreKeyPropertyRemovables[p.Name],p.GetValue(obj)) :  p.GetValue(obj),                        
                         GetEncoder(properties[i].Name), lenghtsList[i])
                     ).ToArray();
 
+                   
                     //If any nulls, then the key becomes a enmpty string.
                     //   if (objs.Any(p => p == null))
                     //       return "";

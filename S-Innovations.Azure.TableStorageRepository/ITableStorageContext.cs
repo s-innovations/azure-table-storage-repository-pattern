@@ -27,6 +27,7 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         Added,
         Updated,
+    //    UpdatedWithReversionTracking,
         Deleted,
         Unmodified,
     }
@@ -46,6 +47,8 @@ namespace SInnovations.Azure.TableStorageRepository
         public EntityState State { get; set; }
         public T Entity { get; set; }
         public bool KeysLocked{get;set;}
+
+      //  internal string PartitionKey { get { return State == EntityState.UpdatedWithReversionTracking ? Entity.PartitionKey.Replace("HEAD","REV") :  Entity.PartitionKey; } }
     }
 
     

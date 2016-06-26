@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections;
+using SInnovations.Azure.TableStorageRepository.TableRepositories;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -25,11 +27,11 @@ namespace SInnovations.Azure.TableStorageRepository
         }
         public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
         {
-            if(Config.CopyAllProperties && Ref is IEntityAdapter)
+            if (Config.CopyAllProperties && Ref is IEntityAdapter)
             {
                 var adapter = Ref as IEntityAdapter;
                 var baseProps = base.WriteEntity(operationContext);
-                var props= baseProps.Concat(adapter.WrittenProperties.Where(k => !(k.Key == "PartitionKey" || k.Key == "RowKey")))
+                var props = baseProps.Concat(adapter.WrittenProperties.Where(k => !(k.Key == "PartitionKey" || k.Key == "RowKey")))
                     .ToDictionary(k => k.Key, v => v.Value);
                 return props;
             }
@@ -42,24 +44,30 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         object GetInnerObject();
         IDictionary<string, EntityProperty> Properties { get; }
-        IDictionary<string,EntityProperty> WrittenProperties { get; }
+        IDictionary<string, EntityProperty> WrittenProperties { get; }
+
+        Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity;
     }
     public interface IEntityAdapter<T> : IEntityAdapter
     {
         T InnerObject { get; }
     }
-    public class EntityAdapter<T> : IEntityAdapter, ITableEntity
+    public class EntityAdapter<TEntity> : IEntityAdapter, ITableEntity
     {
+        public delegate Task<bool> OnEntityChanged(TEntity current, TEntity old, IDictionary<string, EntityProperty> currentProps, IDictionary<string, EntityProperty> oldProps);
+
+        OnEntityChanged onEntityCHanged;
+
         ITableStorageContext context;
-        EntityTypeConfiguration<T> config;
+        EntityTypeConfiguration<TEntity> config;
         public EntityAdapter()
         {
             // If you would like to work with objects that do not have a default Ctor you can use (T)Activator.CreateInstance(typeof(T));
-         //   this.InnerObject = new T();
-            this.config = EntityTypeConfigurationsContainer.Entity<T>();
+            //   this.InnerObject = new T();
+            this.config = EntityTypeConfigurationsContainer.Entity<TEntity>();
         }
 
-        internal EntityAdapter(ITableStorageContext context , EntityTypeConfiguration<T> config, T innerObject, DateTimeOffset? timestamp = null, string Etag = null)
+        internal EntityAdapter(ITableStorageContext context, EntityTypeConfiguration<TEntity> config, TEntity innerObject, DateTimeOffset? timestamp = null, string Etag = null)
         {
             this.context = context;
             this.InnerObject = innerObject;
@@ -68,8 +76,17 @@ namespace SInnovations.Azure.TableStorageRepository
             this.ETag = Etag;
             this.config = config;
         }
+
+        internal EntityAdapter(ITableStorageContext context, EntityTypeConfiguration<TEntity> config, TEntity innerObject, OnEntityChanged onEntityCHanged, DateTimeOffset? timestamp = null, string Etag = null)
+            : this(context,config,innerObject,timestamp,Etag)
+        {
+            this.onEntityCHanged = onEntityCHanged;
+        }
+
+        public EntityAdapter<TEntity> ReversionBase { get; private set; }
+
         public object GetInnerObject() { return InnerObject; }
-        public T InnerObject { get; set; }
+        public TEntity InnerObject { get; set; }
 
 
         public EntityState State { get; set; }
@@ -103,7 +120,7 @@ namespace SInnovations.Azure.TableStorageRepository
             this.InnerObject = config.CreateEntity(properties);
             //Read all default supported types from table entity
             TableEntity.ReadUserObject(this.InnerObject, properties, operationContext);
-            
+
             //Read all custom properties configured.
             var tasks = new List<Task>();
             foreach (var propInfo in config.Properties)
@@ -112,16 +129,17 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     var prop = properties[propInfo.PropertyInfo.Name];
                     tasks.Add(propInfo.SetPropertyAsync(this.InnerObject, prop));
-                }else if (propInfo.IsComposite)
+                }
+                else if (propInfo.IsComposite)
                 {
-                    tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, properties.Where(k=>k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k=>k.Key.Substring(propInfo.PropertyInfo.Name.Length+2), v=>v.Value)));
+                    tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, properties.Where(k => k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k => k.Key.Substring(propInfo.PropertyInfo.Name.Length + 2), v => v.Value)));
                 }
             }
             Task.WaitAll(tasks.ToArray());
 
             //Set the properties
             Properties = properties;
-            
+
             //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
             config.ReverseKeyMapping(this);
 
@@ -131,13 +149,19 @@ namespace SInnovations.Azure.TableStorageRepository
         public virtual IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
         {
 
-            if (this.InnerObject == null){                
+            if (this.InnerObject == null)
+            {
                 return new Dictionary<string, EntityProperty>();
             }
 
-            
+            if (WrittenProperties != null)
+            {
+                return WrittenProperties;
+            }
+
+
             WrittenProperties = TableEntity.WriteUserObject(this.InnerObject, operationContext);
-            
+
             var all = Task.WhenAll(config.Properties
             .Select(async propInfo =>
                 new
@@ -154,25 +178,29 @@ namespace SInnovations.Azure.TableStorageRepository
 
             foreach (var propInfo in all.Where(p => p.Properties != null))
             {
-                foreach (var prop in propInfo.Properties) {
+                foreach (var prop in propInfo.Properties)
+                {
                     WrittenProperties.Add($"{propInfo.Key}__{prop.Key}", prop.Value);
                 }
             }
 
             if (Properties != null)
-            foreach (var propInfo in Properties)
-            {
-                if (!WrittenProperties.ContainsKey(propInfo.Key))
+                foreach (var propInfo in Properties)
+                {
+                    if (!WrittenProperties.ContainsKey(propInfo.Key))
                         WrittenProperties.Add(propInfo.Key, propInfo.Value);
-            }
+                }
 
             //Remove those parts that is used for partition/row keys. (redundant data)
             var keyprops = config.KeyMappings.Keys.SelectMany(k => k.Split(new string[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries));
-            foreach (var key in keyprops.Where(n=>!config.IgnoreKeyPropertyRemovables.ContainsKey(n)))
+            foreach (var key in keyprops.Where(n => !config.IgnoreKeyPropertyRemovables.ContainsKey(n)))
                 WrittenProperties.Remove(key);
 
 
             EnsureSizeLimites(WrittenProperties);
+
+
+
 
             return WrittenProperties;
         }
@@ -201,8 +229,86 @@ namespace SInnovations.Azure.TableStorageRepository
             }
         }
 
+        public async Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity
+        {
+            var rowKey = RowKey;
+               RowKey = "";
+            var copy = new EntityAdapter<TEntity>(context, config, InnerObject)
+            {
+                ReversionBase = old as EntityAdapter<TEntity>,
+                PartitionKey = PartitionKey.Replace("HEAD", "REV"),
+                RowKey = rowKey,
+               
+            };
+
+            if (copy.ReversionBase != null)
+            {
+                var oldProps = copy.ReversionBase.Properties;
+                var newProps = copy.WriteEntity(null);
+                foreach (var key in oldProps.Keys)
+                {
+                    if (newProps.ContainsKey(key))
+                    {
+                        var oldValue = oldProps[key];
+                        var newValue = newProps[key];
+                        if (oldValue.PropertyType == newValue.PropertyType)
+                        {
+                            if (oldValue.PropertyType == EdmType.Binary)
+                            {
+                                if(StructuralComparisons.StructuralEqualityComparer.Equals(oldValue.BinaryValue, newValue.BinaryValue))
+                                {
+                                    newProps.Remove(key);
+                                }
+                            }
+                            else
+                            {
+                                if (oldValue.PropertyAsObject.Equals(newValue.PropertyAsObject))
+                                {
+                                    newProps.Remove(key);
+                                }
+                            } 
+
+                        }
+                    }
+                }
+                foreach( var key in config.IgnoreKeyPropertyRemovables.Keys)
+                {
+                    if(newProps.ContainsKey(key))
+                        newProps.Remove(key);
+                }
+
+                if (!newProps.Any())
+                {
+                    return null;
+                }else
+                {
+                    if(onEntityCHanged != null)
+                    {
+                        if(!await onEntityCHanged(copy.InnerObject, copy.ReversionBase.InnerObject, newProps, oldProps))
+                        {
+                            return null;
+                        }
+                    }
+
+                    //if (config.ReversionTracking.OnEntityChanged != null)
+                    //{//T innerObject1, T innerObject2, IDictionary<string, EntityProperty> newProps
+                    //    var func = config.ReversionTracking.OnEntityChanged as Func<T, T, IDictionary<string, EntityProperty>, IDictionary<string, EntityProperty>, bool>;
+                    //    if(!func(copy.InnerObject, copy.ReversionBase.InnerObject, newProps, oldProps))
+                    //    {
+                    //        return null;
+                    //    }
+                    //}
+                }
+            }
+
+           
+
+            return copy as TTableEntity;
+        }
+
         public virtual IDictionary<string, EntityProperty> Properties { get; set; }
 
         public IDictionary<string, EntityProperty> WrittenProperties { get; set; }
+
     }
 }

@@ -10,6 +10,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.WindowsAzure.Storage;
+using System.Linq.Expressions;
+using SInnovations.Azure.TableStorageRepository.Queryable;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
@@ -30,12 +33,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
 
-    public abstract class TableRepository<TEntity> where TEntity : ITableEntity,new()
+    public abstract class TableRepository<TEntity> where TEntity : class,ITableEntity, new()
     {
         private ILog Logger = LogProvider.GetCurrentClassLogger();
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
-        
+
 
         public CloudTable Table { get { return table.Value; } }
         protected Lazy<CloudTable> table;
@@ -52,24 +55,24 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName));
         }
 
-        
-     //   public abstract TableQuery<TEntity> Source { get; }
+
+        //   public abstract TableQuery<TEntity> Source { get; }
 
 
 
         public virtual void Add(TEntity entity)
         {
             if (Configuration.TraceOnAdd && Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository"); }
-           
+
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity });
         }
-        public virtual void Add(TEntity entity,string partitionkey, string rowkey)
+        public virtual void Add(TEntity entity, string partitionkey, string rowkey)
         {
             if (Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository using partitionkey:{partitionkey},rowkey:{rowkey}"); }
 
             entity.PartitionKey = partitionkey;
             entity.RowKey = rowkey;
-            this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity, KeysLocked=true });
+            this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity, KeysLocked = true });
         }
 
         public void Delete(TEntity entity)
@@ -92,7 +95,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
             var op = TableOperation.Retrieve<TEntity>(partitionKey, rowKey);
-            var result = await Table.ExecuteAsync(op);          
+            var result = await Table.ExecuteAsync(op);
             return SetCollections((TEntity)result.Result);
         }
         public Task DeleteByKey(string partitionKey, string rowKey)
@@ -126,7 +129,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return default(TEntity);
         }
 
-       
+
         protected TEntity SetCollections(TEntity entity)
         {
             //if (typeof(T) != typeof(TEntity))
@@ -137,14 +140,64 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             IEntityAdapter adapter = entity as IEntityAdapter;
             object obj = entity;
-            if (adapter!=null)
-               obj = adapter.GetInnerObject();
+            if (adapter != null)
+                obj = adapter.GetInnerObject();
 
             foreach (var collectionInfo in Configuration.Collections)
             {
-                collectionInfo.SetCollection(obj,Context);
+                collectionInfo.SetCollection(obj, Context);
             }
             return entity;
+        }
+
+        public static IPropagatorBlock<EntityStateWrapper<TEntity>, EntityStateWrapper<TEntity>[]>
+        CreateGroupingBlock()
+        {
+            var dictionary = new Dictionary<string, List<EntityStateWrapper<TEntity>>>();
+            var buffer = new BufferBlock<EntityStateWrapper<TEntity>[]>();
+
+            var actionBlock = new ActionBlock<EntityStateWrapper<TEntity>>(async (state) =>
+            {
+                if (!dictionary.ContainsKey(state.Entity.PartitionKey))
+                {
+                    dictionary[state.Entity.PartitionKey] = new List<EntityStateWrapper<TEntity>>();
+                }
+
+                dictionary[state.Entity.PartitionKey].Add(state);
+
+                if(dictionary[state.Entity.PartitionKey].Count >= 100)
+                {
+                    await buffer.SendAsync(dictionary[state.Entity.PartitionKey].ToArray());
+                    dictionary[state.Entity.PartitionKey].Clear();
+                }
+
+            });
+            actionBlock.Completion.ContinueWith((task) =>
+            {
+                foreach(var key in dictionary.Keys.ToArray())
+                {
+                    buffer.Post(dictionary[key].ToArray());
+                    dictionary.Remove(key);
+                }
+                buffer.Complete();
+            });
+            var prop= DataflowBlock.Encapsulate(actionBlock, buffer);
+            //prop.Completion.ContinueWith(task =>
+            //{
+            //    foreach (var key in dictionary.Keys.ToArray())
+            //    {
+            //        buffer.Post(dictionary[key].ToArray());
+            //        dictionary.Remove(key);
+            //    }
+            //    buffer.Complete();
+            //});
+            return prop;
+
+
+             
+
+         
+
         }
 
         public async Task SaveChangesAsync()
@@ -156,7 +209,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 if (Logger.IsTraceEnabled()) { Logger.Trace($"SaveChangesAsync had empty cache"); }
                 return;
             }
-    
+
             var indexes = new ConcurrentBag<EntityStateWrapper<IndexEntity>>();
 
             var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
@@ -166,9 +219,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
                 {
-                    
+
                     switch (item.State)
                     {
+ 
                         case EntityState.Added:
 
                             foreach (var index in Configuration.Indexes.Values)
@@ -214,15 +268,23 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
                 }
 
-                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count,Table.Name)))
+                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count, Table.Name)))
                 {
-                    try {
+                    try
+                    {
                         //table.ExecuteBatch(batchOpr);
                         if (batchOpr.Count == 1)
                             await Table.ExecuteAsync(batchOpr.First());
                         else
                             await Table.ExecuteBatchAsync(batchOpr);
-                    }catch(Exception ex)
+                    }
+                    catch (StorageException ex)
+                    {
+                        Logger.TraceException("Storage Error execution", ex);
+                        throw;
+
+                    }
+                    catch (Exception ex)
                     {
                         Logger.TraceException("Error execution", ex);
                         throw;
@@ -233,20 +295,89 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             using (new TraceTimer("Handling Entities"))
             {
-                var batches = _cache.GroupBy(b => SetKeys(b.Entity,b.KeysLocked).PartitionKey);
-                foreach (var group in batches)
-                    foreach (var batch in group
-                          .Select((x, i) => new { Group = x, Index = i })
-                          .GroupBy(x => x.Index / 100)
-                          .Select(x => x.Select(v => v.Group).ToArray())
-                          .Select(t => t.ToArray()))
-                    {
-                        Logger.Trace($"Posting Batch of lenght: {batch.Length}");
-                        await actionblock.SendAsync(batch);
-                    }
+                var buffer = new BufferBlock<EntityStateWrapper<TEntity>>();
+                var next = buffer;
 
-                actionblock.Complete();
+                var reversionOptions = Configuration.ReversionTracking;
+                if (reversionOptions.Enabled)
+                {
+                //    var store = this as ITableRepository<TEntity>;
+                   
+                    next = new BufferBlock<EntityStateWrapper<TEntity>>();
+
+                    var trackReversionBlock = new TransformManyBlock<EntityStateWrapper<TEntity>, EntityStateWrapper<TEntity>>(async state =>
+                    {
+                        var entity = state.Entity;
+                      
+                       
+                        
+
+                        var oldQuery = reversionOptions.HeadWhereFilter.DynamicInvoke(this, (entity as IEntityAdapter)?.GetInnerObject() ?? entity) as ITableQuery;
+
+                        var old = await this.Table.ExecuteQueryAsync(new TableQuery<TEntity> { FilterString = oldQuery.FilterString, TakeCount = 1 });
+
+                       
+
+                        if (entity is IEntityAdapter)
+                        {
+                            var adapter = entity as IEntityAdapter;
+                            entity = await adapter.MakeReversionCloneAsync(old.FirstOrDefault());
+
+                          
+                        }
+                        if (entity != null)
+                        {
+                            return new[] { state, new EntityStateWrapper<TEntity> { State = state.State, Entity = entity } };
+                        }
+                        return new[] { state };
+
+                    }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
+
+                    buffer.LinkTo(trackReversionBlock, new DataflowLinkOptions { PropagateCompletion = true });                    
+                    trackReversionBlock.LinkTo(next, new DataflowLinkOptions { PropagateCompletion = true });
+                   // trackReversionBlock.Completion.ContinueWith(t =>
+                   //  {
+                   //       if (t.IsFaulted) ((IDataflowBlock)next).Fault(t.Exception);
+                   //       else next.Complete();
+                   //   });
+
+
+
+
+                }
+
+                var grouper = CreateGroupingBlock();
+                next.LinkTo(grouper, new DataflowLinkOptions { PropagateCompletion = true });
+                grouper.LinkTo(actionblock, new DataflowLinkOptions { PropagateCompletion = true });
+
+
+                foreach (var entityState in _cache)
+                {
+                    var entity = SetKeys(entityState.Entity, entityState.KeysLocked);
+                    
+                    buffer.Post(entityState);
+                }
+
+                buffer.Complete();
                 await actionblock.Completion;
+              //  var a = new System.Threading.Tasks.Dataflow.BatchBlock(100,new GroupingDataflowBlockOptions {})
+
+
+              
+                //var batches = _cache.GroupBy(b => SetKeys(b.Entity, b.KeysLocked).PartitionKey);
+                //foreach (var group in batches)
+                //    foreach (var batch in group
+                //          .Select((x, i) => new { Group = x, Index = i })
+                //          .GroupBy(x => x.Index / 100)
+                //          .Select(x => x.Select(v => v.Group).ToArray())
+                //          .Select(t => t.ToArray()))
+                //    {
+                //        Logger.Trace($"Posting Batch of lenght: {batch.Length}");
+                //        await actionblock.SendAsync(batch);
+                //    }
+
+              //  actionblock.Complete();
+              //  await actionblock.Completion;
             }
 
             var block = new ActionBlock<Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>>(async (tuple) =>
@@ -331,7 +462,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return ent;
         }
 
-        protected virtual TEntity SetKeys(TEntity entity,bool keysLocked)
+        protected virtual TEntity SetKeys(TEntity entity, bool keysLocked)
         {
             if (keysLocked)
                 return entity;
@@ -348,11 +479,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         private TableOperation GetInsertionOperation<Entity>(Entity item) where Entity : ITableEntity
         {
-             if (item.PartitionKey == null)
+            if (item.PartitionKey == null)
             {
-               Trace.TraceError(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType,d.Value.PropertyAsObject))));     
+                Logger.Fatal(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType, d.Value.PropertyAsObject))));
                 throw new NullReferenceException("The partionKey was not set");
             }
+
+
 
             TableOperation opr;
             switch (this.Context.InsertionMode)
@@ -374,17 +507,18 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         }
 
 
-        public async Task<Tuple<IEnumerable<TEntity>,TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
+        public async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
         {
-            var q = new TableQuery<TEntity>{
-                 FilterString = query.FilterString,
-                 SelectColumns = query.SelectColumns,
-                  TakeCount = query.TakeCount
+            var q = new TableQuery<TEntity>
+            {
+                FilterString = query.FilterString,
+                SelectColumns = query.SelectColumns,
+                TakeCount = query.TakeCount
             };
             var result = await Table.ExecuteQuerySegmentedAsync<TEntity>(q, currentToken);
             return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Results, result.ContinuationToken);
 
         }
-       
+
     }
 }

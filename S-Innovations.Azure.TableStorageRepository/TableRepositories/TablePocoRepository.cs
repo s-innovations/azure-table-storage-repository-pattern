@@ -20,6 +20,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            TableRepository<EntityAdapter<TEntity>>,
            ITableRepository<TEntity>
     {
+
+       
         private readonly Expression _expression;
         public new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
@@ -59,6 +61,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 throw new Exception("Inner Object is null");
             try
             {
+                if (Configuration.ReversionTracking.Enabled)
+                {
+                    if(entity.ReversionBase != null)
+                    {
+
+                    }
+                }
+
                 entity.PartitionKey = mapper.PartitionKeyMapper(entity.InnerObject);
                 entity.RowKey = mapper.RowKeyMapper(entity.InnerObject);
 
@@ -183,6 +193,17 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             base.Add(new EntityAdapter<TEntity>(Context,Configuration, entity));
         }
+
+        public void AddRevision(TEntity entity, EntityAdapter<TEntity>.OnEntityChanged onEntityChanged)
+        {
+            if (!Configuration.ReversionTracking.Enabled)
+            {
+                throw new Exception("RevisionTracking not enabled");
+            }
+
+            base.Add(new EntityAdapter<TEntity>(Context, Configuration, entity, onEntityChanged));
+        }
+
         public void Add(TEntity entity, string partitionKey, string rowKey)
         {
             base.Add(new EntityAdapter<TEntity>(Context, Configuration, entity), partitionKey, rowKey);

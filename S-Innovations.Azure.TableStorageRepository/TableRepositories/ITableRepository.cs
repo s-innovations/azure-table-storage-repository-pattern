@@ -31,6 +31,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// <param name="rowkey"></param>
         void Add(TEntity entity,string partitionkey,string rowkey);
 
+        void AddRevision(TEntity entity, EntityAdapter<TEntity>.OnEntityChanged onEntityChanged);
+
         void Add(TEntity entity, IDictionary<string, EntityProperty> additionalProperties);
         void Delete(TEntity entity);
         void Update(TEntity entity);
