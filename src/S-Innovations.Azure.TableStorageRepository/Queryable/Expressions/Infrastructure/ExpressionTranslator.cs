@@ -85,8 +85,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     {
                         k.Key,
                         PropertyName = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.PropertyName)),
-                        StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Where(v=>v.StartsWith).Select(v => v.Value)),
-                        EqualPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Where(v => !v.StartsWith).Select(v => v.Value)),
+                        StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value)),
+                        HasStartsWith = k.Any(v=>v.StartsWith),// string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value)),
                     }).ToArray();
 
                 for (int i = 0; i < keys.Length; ++i)
@@ -100,21 +100,15 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         filter.Append(" and ");
 
 
-                    if (!string.IsNullOrEmpty(key.EqualPattern))
+                    if (!key.HasStartsWith)
                     {
                         filter.Append(key.Key);
                         filter.Append(" eq '");
-                        filter.Append(key.EqualPattern);
+                        filter.Append(key.StartsWithPattern);
                         filter.Append("'");
 
-                        if (!string.IsNullOrEmpty(key.StartsWithPattern))
-                        {
-                            filter.Append(" and ");
-                        }
-                    }
 
-                    if (!string.IsNullOrEmpty(key.StartsWithPattern))
-                    {
+                    }else { 
 
                         var length = key.StartsWithPattern.Length - 1;
                         var lastChar = key.StartsWithPattern[length];
