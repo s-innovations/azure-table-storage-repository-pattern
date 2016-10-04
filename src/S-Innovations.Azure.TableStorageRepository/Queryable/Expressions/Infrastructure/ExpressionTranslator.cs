@@ -25,6 +25,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             public String Value { get; set; }
 
             public string PropertyName { get; set; }
+            public bool StartsWith { get;  set; }
         }
         static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
 
@@ -84,7 +85,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     {
                         k.Key,
                         PropertyName = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.PropertyName)),
-                        StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value))
+                        StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Where(v=>v.StartsWith).Select(v => v.Value)),
+                        EqualPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Where(v => !v.StartsWith).Select(v => v.Value)),
                     }).ToArray();
 
                 for (int i = 0; i < keys.Length; ++i)
@@ -98,21 +100,40 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         filter.Append(" and ");
 
 
-                    var length = key.StartsWithPattern.Length - 1;
-                    var lastChar = key.StartsWithPattern[length];
-                    var nextLastChar = (char)(lastChar + 1);
-                    var startsWithEndPattern = key.StartsWithPattern.Substring(0, length) + nextLastChar;
+                    if (!string.IsNullOrEmpty(key.EqualPattern))
+                    {
+                        filter.Append(key.Key);
+                        filter.Append(" eq '");
+                        filter.Append(key.EqualPattern);
+                        filter.Append("'");
+
+                        if (!string.IsNullOrEmpty(key.StartsWithPattern))
+                        {
+                            filter.Append(" and ");
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(key.StartsWithPattern))
+                    {
+
+                        var length = key.StartsWithPattern.Length - 1;
+                        var lastChar = key.StartsWithPattern[length];
+                        var nextLastChar = (char)(lastChar + 1);
+                        var startsWithEndPattern = key.StartsWithPattern.Substring(0, length) + nextLastChar;
 
 
-                    filter.Append(key.Key);
-                    filter.Append(" ge '");
-                    filter.Append(key.StartsWithPattern);
-                    filter.Append("' and ");
-                    filter.Append(key.Key);
-                    filter.Append(" lt '");
-                    filter.Append(startsWithEndPattern);
-                    filter.Append("'");
+                        filter.Append(key.Key);
+                        filter.Append(" ge '");
+                        filter.Append(key.StartsWithPattern);
+                        filter.Append("' and ");
+                        filter.Append(key.Key);
+                        filter.Append(" lt '");
+                        filter.Append(startsWithEndPattern);
+                        filter.Append("'");
 
+                    }
+
+                   
 
                 }
 
@@ -453,6 +474,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                             Type = _nameChanges[key],
                             Value = startsWithPattern,
                             Position = Array.IndexOf(keys, propName),
+                            StartsWith = true
                         });
                     }
                     else
