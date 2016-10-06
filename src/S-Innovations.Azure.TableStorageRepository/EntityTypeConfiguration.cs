@@ -24,7 +24,7 @@ namespace SInnovations.Azure.TableStorageRepository
     }
     public abstract class IndexConfiguration
     {
-        public string TableName { get; set; }
+        public Func<string> TableName { get; set; }
         public string TableNamePostFix { get; set; } = "Index";
 
         public abstract string[] GetIndexKey(object entity);
@@ -206,7 +206,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public List<CollectionConfiguration> Collections { get; set; }
         public List<PropertyConfiguration> Properties { get; set; }
 
-        public string TableName { get; protected set; }
+        public Func<string> TableName { get; protected set; }
 
         public KeysMapper<TEntity> GetKeyMappers<TEntity>()
         {
@@ -441,7 +441,7 @@ namespace SInnovations.Azure.TableStorageRepository
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
                 PartitionKeyProvider = entityToKeyProperty,
-                TableName = TableName ?? (string.IsNullOrWhiteSpace(this.TableName) ? null : this.TableName + "Index"),            
+                TableName = ()=> TableName ?? (string.IsNullOrWhiteSpace(this.TableName?.Invoke()) ? null : this.TableName() + "Index"),            
                 GetIndexKeyFunc = (objs) =>
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
@@ -657,11 +657,19 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return this;
         }
-        public EntityTypeConfiguration<TEntityType> ToTable(string tableName)
+        public EntityTypeConfiguration<TEntityType> ToTable(Func<string> tableName)
         {
             this.TableName = tableName;
-            foreach (var index in Indexes.Where(i => string.IsNullOrWhiteSpace(i.Value.TableName)))
-                index.Value.TableName = this.TableName + index.Value.TableNamePostFix;
+            foreach (var index in Indexes.Where(i => null == (i.Value.TableName)))
+                index.Value.TableName = ()=> this.TableName() + index.Value.TableNamePostFix;
+
+            return this;
+        }
+        public EntityTypeConfiguration<TEntityType> ToTable(string tableName)
+        {
+            this.TableName = ()=>tableName;
+            foreach (var index in Indexes.Where(i => null == (i.Value.TableName)))
+                index.Value.TableName = () => this.TableName() + index.Value.TableNamePostFix;
 
             return this;
         }

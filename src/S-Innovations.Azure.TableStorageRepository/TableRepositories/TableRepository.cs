@@ -52,7 +52,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             this.Context = context;
             this.configuration = configuration;
-            this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName));
+            this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName()));
         }
 
 
@@ -108,7 +108,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding by index keys {string.Join(",", keys)}"); }
 
-            foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName ?? Configuration.TableName + idx.TableNamePostFix))
+            foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName?.Invoke() ?? Configuration.TableName() + idx.TableNamePostFix))
             {
                 var table = Context.GetTable(index.Key);
 
@@ -444,7 +444,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             using (new TraceTimer("Handling Indexes"))
             {
-                foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName ?? Configuration.TableName + idx.Entity.Config.TableNamePostFix))
+                foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName?.Invoke() ?? Configuration.TableName() + idx.Entity.Config.TableNamePostFix))
                 {
                     var indexTable = Context.GetTable(indexkey.Key);
                     var batches = indexkey.GroupBy(k => k.Entity.PartitionKey);
