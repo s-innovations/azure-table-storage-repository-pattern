@@ -500,7 +500,7 @@ namespace SInnovations.Azure.TableStorageRepository
             var quadKey = QuadKeyFromExtent(extent);
             Logger.Trace($"Extent:[{string.Join(",", extent)}] : {quadKey}");
 
-            var tableClient = table.Context.GetTable(spatial.TableName());
+            var tableClient = table.Context.GetTable(spatial.TableName(table.Context));
             var queries = new List<TableQuery<EntityAdapter<TEntity>>>();
 
             var tableQuery = new TableQuery<EntityAdapter<TEntity>>();
@@ -575,7 +575,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 PartitionSplitKeyProvider = indx.GetKey,
                 //        PartitionKeyProvider = indx.GetKey,
                 RowKeyProvider = entityToKeyProperty,
-                TableName = ()=> TableName ?? (string.IsNullOrWhiteSpace(config.TableName()) ? null : config.TableName() + "SpatialIndex"),
+                TableName = (ctx)=> TableName ?? (string.IsNullOrWhiteSpace(config.TableName(ctx)) ? null : config.TableName(ctx) + "SpatialIndex"),
                 TableNamePostFix = "SpatialIndex",
                 CopyAllProperties = true,
             });

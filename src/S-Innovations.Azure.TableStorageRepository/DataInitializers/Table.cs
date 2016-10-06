@@ -22,10 +22,10 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
             {
                 var configuration = EntityTypeConfigurationsContainer.Configurations[tableType];
                 //DROP
-                var table = context.GetTable(configuration.TableName());
+                var table = context.GetTable(configuration.TableName(context));
                 {
                     table.DeleteIfExists();
-                    var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke() ?? configuration.TableName() + index.Value.TableNamePostFix).DeleteIfExistsAsync()).ToArray();
+                    var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).DeleteIfExistsAsync()).ToArray();
                     Task.WaitAll(tasks);
                 }
 
@@ -34,8 +34,8 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
                 {
                     try
                     {
-                        context.GetTable(configuration.TableName()).CreateIfNotExists();
-                        var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke() ?? configuration.TableName() + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
+                        context.GetTable(configuration.TableName(context)).CreateIfNotExists();
+                        var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                         Task.WaitAll(tasks);
                         
                         Logger.Info("Creating was successfull");
@@ -65,8 +65,8 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
             foreach (var table in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
                 var configuration = EntityTypeConfigurationsContainer.Configurations[table];
-                context.GetTable(configuration.TableName()).CreateIfNotExists();
-                var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke() ?? configuration.TableName() + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
+                context.GetTable(configuration.TableName(context)).CreateIfNotExists();
+                var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                 Task.WaitAll(tasks);
                     
             }

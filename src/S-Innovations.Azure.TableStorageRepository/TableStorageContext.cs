@@ -190,7 +190,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public CloudTable GetTable<T1>()
         {
-            return _client.Value.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName());
+            return _client.Value.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName(this));
         }
 
 
