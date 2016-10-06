@@ -65,7 +65,8 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
             foreach (var table in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
                 var configuration = EntityTypeConfigurationsContainer.Configurations[table];
-                context.GetTable(configuration.TableName(context)).CreateIfNotExists();
+                var tableName = configuration.TableName(context);
+                context.GetTable(tableName).CreateIfNotExists();
                 var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                 Task.WaitAll(tasks);
                     

@@ -665,6 +665,12 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return this;
         }
+
+        public EntityTypeConfiguration<TEntityType> ToTable<TContext>(Func<TContext, string> tableName) where TContext : class,ITableStorageContext
+        {
+            return ToTable((ctx) => tableName(ctx as TContext));
+        }
+
         public EntityTypeConfiguration<TEntityType> ToTable(string tableName)
         {
             this.TableName = (ctx)=>tableName;
