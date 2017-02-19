@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -39,7 +40,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                             throw new InvalidCastException(invalidCast);
                         }
 
-                        object value = convertable.ToType(node.Type, Thread.CurrentThread.CurrentCulture);
+                        object value = convertable.ToType(node.Type, CultureInfo.CurrentCulture);
                         return Expression.Constant(value, value.GetType());
                     }
             }
@@ -135,20 +136,22 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
         private ConstantExpression GetMemberConstant(MemberExpression node)
         {
-            object value;
+            object value=null;
 
-            if (node.Member.MemberType == MemberTypes.Field)
-            {
+            var member = node.Member;
+
+
+            FieldInfo field = member as FieldInfo;
+            if (field != null)
                 value = GetFieldValue(node);
-            }
-            else if (node.Member.MemberType == MemberTypes.Property)
-            {
+
+            PropertyInfo property = member as PropertyInfo;
+            if (property != null)
                 value = GetPropertyValue(node);
-            }
-            else
-            {
-                throw new NotSupportedException(string.Format("Invalid member type: {0}", node.Member.MemberType));
-            }
+
+            if(property != null && field != null)
+                throw new NotSupportedException(string.Format("Invalid member type: {0}", node.Member.DeclaringType));
+             
 
             return Expression.Constant(value, node.Type);
         }

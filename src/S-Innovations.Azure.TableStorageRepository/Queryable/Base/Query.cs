@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -38,7 +39,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Base
                 throw new ArgumentNullException("expression");
             }
 
-            if (!typeof(IQueryable<T>).IsAssignableFrom(expression.Type))
+            if (!typeof(IQueryable<T>).GetTypeInfo().IsAssignableFrom(expression.Type.GetTypeInfo()))
             {
                 throw new ArgumentOutOfRangeException("expression");
             }

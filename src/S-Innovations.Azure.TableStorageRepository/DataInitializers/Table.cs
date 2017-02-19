@@ -1,4 +1,4 @@
-﻿using SInnovations.Azure.TableStorageRepository.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,22 +9,25 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
 {
     public class DropTablesAndCreateIfExist<TableContext> : Initializer<TableContext> where TableContext : ITableStorageContext
     {
-        static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
         private Type[] ignored;
-        public DropTablesAndCreateIfExist(params Type[] ignored)
+        private readonly IEntityTypeConfigurationsContainer container;
+        public DropTablesAndCreateIfExist(ILoggerFactory factory, IEntityTypeConfigurationsContainer container, params Type[] ignored)
         {
             this.ignored = ignored;
+            this.Logger = factory.CreateLogger<DropTablesAndCreateIfExist<TableContext>>();
+            this.container = container;
         }
         public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
         {
            
             foreach (var tableType in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
-                var configuration = EntityTypeConfigurationsContainer.Configurations[tableType];
+                var configuration = container.GetConfiguration(tableType);
                 //DROP
                 var table = context.GetTable(configuration.TableName(context));
                 {
-                    table.DeleteIfExists();
+                    table.DeleteIfExistsAsync().GetAwaiter().GetResult();
                     var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).DeleteIfExistsAsync()).ToArray();
                     Task.WaitAll(tasks);
                 }
@@ -34,15 +37,15 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
                 {
                     try
                     {
-                        context.GetTable(configuration.TableName(context)).CreateIfNotExists();
+                        context.GetTable(configuration.TableName(context)).CreateIfNotExistsAsync().GetAwaiter().GetResult();
                         var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                         Task.WaitAll(tasks);
                         
-                        Logger.Info("Creating was successfull");
+                        Logger.LogInformation("Creating was successfull");
                         break;
                     }catch(Exception ex)
                     {
-                        Logger.InfoException("Creating caused exception, retrying", ex);
+                        Logger.LogInformation(new EventId(),ex,"Creating caused exception {ex}, retrying", ex);
                         Task.Delay(5000).Wait();
                     }
 
@@ -55,18 +58,20 @@ namespace SInnovations.Azure.TableStorageRepository.DataInitializers
     public class CreateTablesIfNotExists<TableContext> : Initializer<TableContext> where TableContext : ITableStorageContext
     {
         private Type[] ignored;
-        public CreateTablesIfNotExists(params Type[] ignored)
+        private readonly IEntityTypeConfigurationsContainer container;
+        public CreateTablesIfNotExists(IEntityTypeConfigurationsContainer container, params Type[] ignored)
         {
             this.ignored = ignored;
+            this.container = container;
         }
         public void Initialize(ITableStorageContext context, TableStorageModelBuilder modelbuilder)
         {
            
             foreach (var table in modelbuilder.Entities.Where(t=>!ignored.Any(tt=>t==tt)))
             {
-                var configuration = EntityTypeConfigurationsContainer.Configurations[table];
+                var configuration = container.GetConfiguration(table);
                 var tableName = configuration.TableName(context);
-                context.GetTable(tableName).CreateIfNotExists();
+                context.GetTable(tableName).CreateIfNotExistsAsync().GetAwaiter().GetResult();
                 var tasks = configuration.Indexes.Select(index => context.GetTable(index.Value.TableName?.Invoke(context) ?? configuration.TableName(context) + index.Value.TableNamePostFix).CreateIfNotExistsAsync()).ToArray();
                 Task.WaitAll(tasks);
                     

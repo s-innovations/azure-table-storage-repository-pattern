@@ -7,7 +7,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Linq;
 using SInnovations.Azure.TableStorageRepository.Queryable;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Configuration;
 using Serilog.Events;
@@ -38,15 +38,16 @@ namespace SInnovations.Azure.TableStorageRepository.Test
    
     public class Test7Context : TableStorageContext
     {
+        static EntityTypeConfigurationsContainer container = new EntityTypeConfigurationsContainer(new LoggerFactory());
         static Test7Context()
         {
-            Table.SetInitializer(new CreateTablesIfNotExists<Test7Context>());
+            Table.SetInitializer(new CreateTablesIfNotExists<Test7Context>(container));
 
         }
 
 
         public Test7Context(CloudStorageAccount account)
-            : base( account)
+            : base(new LoggerFactory(), container, account)
         {
             
             this.InsertionMode = SInnovations.Azure.TableStorageRepository.InsertionMode.AddOrMerge;
@@ -59,7 +60,7 @@ namespace SInnovations.Azure.TableStorageRepository.Test
                 .HasKeys( m =>  m.Id, m => "")
                 .WithGeometry(m=>m.Geometry)
                 .WithTagsProperty(m=>m.Tags)
-                .WithSpatialIndex(m=>m.Geometry,m=>m.Id, new ExtentProvider())
+                .WithSpatialIndex(m=>m.Geometry,m=>m.Id, new ExtentProvider(), new LoggerFactory())
                 .ToTable("test11");
 
 
@@ -192,9 +193,10 @@ namespace SInnovations.Azure.TableStorageRepository.Test
       //  [TestMethod]
         public async Task TestMethod4()
         {
+           
             var a = new Test7Context(CloudStorageAccount.DevelopmentStorageAccount);
             var intersect = JObject.Load(new JsonTextReader(new StreamReader(this.GetType().Assembly.GetManifestResourceStream("SInnovations.Azure.TableStorageRepository.Test.intersect.json"))));
-            var test = await a.Entities.SpatialIntersectAsync(intersect, new ExtentProvider(),new SpatialIntersectService<TestEntity,JObject>(k=>Task.FromResult(k.Geometry),k=>Task.FromResult(k.SelectToken("geometry") as JObject)));
+            var test = await a.Entities.SpatialIntersectAsync(intersect, new ExtentProvider(),new SpatialIntersectService<TestEntity,JObject>(k=>Task.FromResult(k.Geometry),k=>Task.FromResult(k.SelectToken("geometry") as JObject)), new LoggerFactory().CreateLogger<UnitTest7>());
 
 
             Assert.AreEqual(4, test.Count());

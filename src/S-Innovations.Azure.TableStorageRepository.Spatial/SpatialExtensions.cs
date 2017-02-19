@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json.Linq;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.Spatial;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 
@@ -270,13 +270,14 @@ namespace SInnovations.Azure.TableStorageRepository
 
     public class Index<TEntityType>
     {
-        private static ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
 
         private ISpatialExtentProvider<TEntityType> extentProvider;
         private TileSystem tileSystem = new TileSystem();
-        public Index(ISpatialExtentProvider<TEntityType> extentProvider)
+        public Index(ILoggerFactory factory, ISpatialExtentProvider<TEntityType> extentProvider)
         {
             this.extentProvider = extentProvider;
+            this.Logger = factory.CreateLogger<Index<TEntityType>>();
         }
         public void SplitTest(int x, int y, int lvl, double[] extentTest, TEntityType entitty, double[] extent, List<string> keys)
         {
@@ -298,7 +299,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             if (extent[0] == extent[2] || extent[1] == extent[3])
             {
-                Logger.Trace($"Extent<{string.Join(",", extent.Select(k => k.ToString("F12")))}> = [{lvl}]");
+                Logger.LogTrace($"Extent<{string.Join(",", extent.Select(k => k.ToString("F12")))}> = [{lvl}]");
                 return new string[1] { "" };
             }
             int minx, miny, maxx, maxy;
@@ -310,7 +311,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 tileSystem.LatLongToPixelXY(extent[3], extent[2], lvl, out maxx, out maxy);
                 tileSystem.PixelXYToTileXY(minx, miny, out minx, out miny);
                 tileSystem.PixelXYToTileXY(maxx, maxy, out maxx, out maxy, true);
-                Logger.Trace($"Extent<{string.Join(",", extent.Select(k => k.ToString("F12")))}> = [{lvl},{minx}-{maxx},{miny}-{maxy}]");
+                Logger.LogTrace($"Extent<{string.Join(",", extent.Select(k => k.ToString("F12")))}> = [{lvl},{minx}-{maxx},{miny}-{maxy}]");
 
                 var extentTestA = new[] { 0.0, 0, 0, 0 };
                 var extentTestB = new[] { 0.0, 0, 0, 0 };
@@ -319,7 +320,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     SplitTest(minx, miny, lvl, extentTestA, entitty, extent, keysAfterSplit);
                     SplitTest(maxx, miny, lvl, extentTestB, entitty, extent, keysAfterSplit);
                     if (keysAfterSplit.Any())
-                        Logger.Trace($"X-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
+                        Logger.LogTrace($"X-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
 
                     if (miny != maxy)
                     {
@@ -327,7 +328,7 @@ namespace SInnovations.Azure.TableStorageRepository
                         SplitTest(minx, maxy, lvl, extentTestA, entitty, extent, keysAfterSplit);
                         SplitTest(maxx, maxy, lvl, extentTestB, entitty, extent, keysAfterSplit);
                         if (keysAfterSplit.Any())
-                            Logger.Trace($"XY-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
+                            Logger.LogTrace($"XY-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
 
                     }
 
@@ -340,7 +341,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     SplitTest(minx, miny, lvl, extentTestA, entitty, extent, keysAfterSplit);
                     SplitTest(minx, maxy, lvl, extentTestB, entitty, extent, keysAfterSplit);
                     if (keysAfterSplit.Any())
-                        Logger.Trace($"Y-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
+                        Logger.LogTrace($"Y-Split<{entitty.GetHashCode()},{lvl},{string.Join(",", extentTestA.Select(k => k.ToString("F12")))},{string.Join(",", extentTestB.Select(k => k.ToString("F12")))}>");
 
                     break;
                 }
@@ -357,7 +358,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 keysAfterSplit.Add(TileXYToQuadKey(tilex.Value, tiley.Value, Math.Max(1, lvl - 1)).PadRight(30, TableStorageContext.KeySeparator.First()));
             }
 
-            Logger.Trace($"SplitResult<{tilex ?? -1},{tiley ?? -1},{lvl}>: {string.Join(",", keysAfterSplit)}");
+            Logger.LogTrace($"SplitResult<{tilex ?? -1},{tiley ?? -1},{lvl}>: {string.Join(",", keysAfterSplit)}");
 
             if (keysAfterSplit.Any())
                 return keysAfterSplit.ToArray();
@@ -370,7 +371,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
 
             var extent = this.extentProvider.GetExtent(entitty);
-            Logger.Trace($"GetKey for entity<{entitty.GetHashCode()},{string.Join(",", extent)}>");
+            Logger.LogTrace($"GetKey for entity<{entitty.GetHashCode()},{string.Join(",", extent)}>");
             return GetByExtentSplitting(entitty, extent, 1).Where(k=>k!="").Distinct().ToArray();
         }
 
@@ -420,7 +421,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 }
             }
 
-        private static ILog Logger = LogProvider.GetCurrentClassLogger();
+       // private  ILog Logger = LogProvider.GetCurrentClassLogger();
 
         public static Task<EntityProperty> GeometryEncode(JObject plainText)
         {
@@ -489,16 +490,16 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             return quadKey.ToString();
         }
-        public static async Task<IEnumerable<TEntity>> SpatialIntersectAsync<TEntity, TIntersectEntity>(this ITableRepository<TEntity> table, TIntersectEntity test, ISpatialExtentProvider<TIntersectEntity> extentProvider, ISpatialIntersectService<TEntity, TIntersectEntity> intersectingService)
+        public static async Task<IEnumerable<TEntity>> SpatialIntersectAsync<TEntity, TIntersectEntity>(this ITableRepository<TEntity> table, TIntersectEntity test, ISpatialExtentProvider<TIntersectEntity> extentProvider, ISpatialIntersectService<TEntity, TIntersectEntity> intersectingService, ILogger Logger)
         {
             var spatial = table.Configuration.Indexes["spatialindex"];
             if (spatial == null)
                 throw new NotSupportedException("The table is not configured for spatialindex");
 
-            Logger.Trace($"Finding Extent for spatial query");
+            Logger.LogTrace($"Finding Extent for spatial query");
             var extent = extentProvider.GetExtent(test);
             var quadKey = QuadKeyFromExtent(extent);
-            Logger.Trace($"Extent:[{string.Join(",", extent)}] : {quadKey}");
+            Logger.LogTrace($"Extent:[{string.Join(",", extent)}] : {quadKey}");
 
             var tableClient = table.Context.GetTable(spatial.TableName(table.Context));
             var queries = new List<TableQuery<EntityAdapter<TEntity>>>();
@@ -536,13 +537,13 @@ namespace SInnovations.Azure.TableStorageRepository
             }
 
             var all = new List<TEntity>();
-            using (new TraceTimer($"Executing query {tableQuery.FilterString}"))
+            using (new TraceTimer(Logger,$"Executing query {tableQuery.FilterString}"))
             {
                 var allEntities = await Task.WhenAll(queries.Select(q => tableClient.ExecuteQueryAsync(q)));
 
                 var entities = allEntities.SelectMany(m => m).ToArray();
                 var intersects = entities.DistinctBy(o=>o.RowKey).Select(k => k.InnerObject).Where(o => intersectingService.IsIntersectingAsync(o, test).Result).ToArray();
-                Logger.Trace($"{entities.Count()} entities downloaded, {intersects.Length} intersects");
+                Logger.LogTrace($"{entities.Count()} entities downloaded, {intersects.Length} intersects");
 
                 all.AddRange(intersects);
             }
@@ -555,6 +556,7 @@ namespace SInnovations.Azure.TableStorageRepository
             Expression<Func<TEntityType, TEntityGeometry>> expression,
             Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression,
             ISpatialExtentProvider<TEntityType> extentProvider,
+            ILoggerFactory factory,
             string TableName = null)
         {
 
@@ -562,7 +564,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
             //string key = "";
 
-            var indx = new Index<TEntityType>(extentProvider);
+            var indx = new Index<TEntityType>(factory,extentProvider);
             string key = "";
 
 

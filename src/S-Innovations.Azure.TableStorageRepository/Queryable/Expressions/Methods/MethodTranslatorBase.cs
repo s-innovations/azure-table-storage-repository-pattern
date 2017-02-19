@@ -1,4 +1,5 @@
-﻿using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infrastructure;
+﻿using Microsoft.Extensions.Logging;
+using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,12 +10,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
 {
     internal abstract class MethodTranslatorBase : IMethodTranslator
     {
+        private readonly ILoggerFactory _logFactory;
         private readonly string _methodName;
         //private readonly IDictionary<string, string> _nameChanges;
         EntityTypeConfiguration _configuration;
 
-        protected MethodTranslatorBase(EntityTypeConfiguration configuration, string methodName)
+        protected MethodTranslatorBase(ILoggerFactory logFactory, EntityTypeConfiguration configuration, string methodName)
         {
+            _logFactory = logFactory;
             //_nameChanges = nameChanges;
             _configuration = configuration;
             _methodName = methodName;
@@ -33,7 +36,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
                 throw new ArgumentOutOfRangeException("method", message);
             }
 
-            var expressionTranslator = new ExpressionTranslator(_configuration);
+            var expressionTranslator = new ExpressionTranslator(_logFactory,_configuration);
 
             MethodCallExpression targetMethod = method;
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,8 +13,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     /// </summary>
     internal sealed class SingleOrDefaultTranslator : MethodTranslatorBase
     {
-        public SingleOrDefaultTranslator(EntityTypeConfiguration configuration)
-            : base(configuration, "SingleOrDefault")
+        public SingleOrDefaultTranslator(ILoggerFactory factory,EntityTypeConfiguration configuration)
+            : base(factory,configuration, "SingleOrDefault")
         {
         }
 

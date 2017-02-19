@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using SInnovations.Azure.TableStorageRepository.DataInitializers;
+using Microsoft.Extensions.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -54,13 +55,15 @@ namespace SInnovations.Azure.TableStorageRepository.Test
     }
 
     public class MyTableStorageContext : TableStorageContext
-    {   
+    {
+        static EntityTypeConfigurationsContainer container = new EntityTypeConfigurationsContainer(new LoggerFactory());
+
         static MyTableStorageContext()
         {
-            Table.SetInitializer(new CreateTablesIfNotExists<MyTableStorageContext>());
+            Table.SetInitializer(new CreateTablesIfNotExists<MyTableStorageContext>(container));
         }
         public string test {get;set;}
-        public MyTableStorageContext() : base(CloudStorageAccount.Parse(File.ReadAllText("C:\\dev\\storagekey.txt")))
+        public MyTableStorageContext() : base(new LoggerFactory(),container,CloudStorageAccount.Parse(File.ReadAllText("C:\\dev\\storagekey.txt")))
         {
             test = "a";
             this.InsertionMode = InsertionMode.AddOrMerge;

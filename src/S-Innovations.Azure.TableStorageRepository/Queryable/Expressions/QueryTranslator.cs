@@ -1,4 +1,5 @@
-﻿using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Methods;
+﻿using Microsoft.Extensions.Logging;
+using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Methods;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,8 +19,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
         /// <summary>
         ///     Constructor.
         /// </summary>
-        internal QueryTranslator(EntityTypeConfiguration configuration)
-            : this(GetTranslators(configuration))
+        internal QueryTranslator(ILoggerFactory factory,EntityTypeConfiguration configuration)
+            : this(GetTranslators(factory,configuration))
         {
         }
 
@@ -65,15 +66,15 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions
             // ReSharper restore ForCanBeConvertedToForeach
         }
 
-        private static IEnumerable<IMethodTranslator> GetTranslators(EntityTypeConfiguration configuration)
+        private static IEnumerable<IMethodTranslator> GetTranslators(ILoggerFactory factory, EntityTypeConfiguration configuration)
         {
             return new List<IMethodTranslator>
                 {
-                    new WhereTranslator(configuration),
-                    new FirstTranslator(configuration),
-                    new FirstOrDefaultTranslator(configuration),
-                    new SingleTranslator(configuration),
-                    new SingleOrDefaultTranslator(configuration),
+                    new WhereTranslator(factory,configuration),
+                    new FirstTranslator(factory,configuration),
+                    new FirstOrDefaultTranslator(factory,configuration),
+                    new SingleTranslator(factory,configuration),
+                    new SingleOrDefaultTranslator(factory,configuration),
                     new SelectTranslator(configuration.KeyMappings),
                     new TakeTranslator()
                 };

@@ -48,7 +48,7 @@ namespace Microsoft.WindowsAzure.Storage.Table
             CancellationToken cancellationToken = default (CancellationToken)) where T : ITableEntity,new()
         {
             return cloudTable
-                .ExecuteQuerySegmentedAsync(tableQuery, continuationToken, cancellationToken)
+                .ExecuteQuerySegmentedAsync(tableQuery, continuationToken,null,null, cancellationToken)
                 .Then(result =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();

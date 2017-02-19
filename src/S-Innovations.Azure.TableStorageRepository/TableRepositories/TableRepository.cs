@@ -9,10 +9,10 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using SInnovations.Azure.TableStorageRepository.Logging;
 using Microsoft.WindowsAzure.Storage;
 using System.Linq.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable;
+using Microsoft.Extensions.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
@@ -35,7 +35,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
     public abstract class TableRepository<TEntity> where TEntity : class, ITableEntity, new()
     {
-        private ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
 
@@ -48,8 +48,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         protected readonly Lazy<EntityTypeConfiguration> configuration;
         public ITableStorageContext Context { get; private set; }
 
-        internal TableRepository(ITableStorageContext context, Lazy<EntityTypeConfiguration> configuration)
+        internal TableRepository(ILoggerFactory logFactory, ITableStorageContext context, Lazy<EntityTypeConfiguration> configuration)
         {
+            this.Logger = logFactory.CreateLogger<TableRepository<TEntity>>();
             this.Context = context;
             this.configuration = configuration;
             this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName(context)));
@@ -62,13 +63,18 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public virtual void Add(TEntity entity)
         {
-            if (Configuration.TraceOnAdd && Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository"); }
+            if (Configuration.TraceOnAdd) {
+                Logger.LogTrace($"Adding entity<{entity.GetHashCode()} to TableRepository");
+            }
 
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Added, Entity = entity });
         }
         public virtual void Add(TEntity entity, string partitionkey, string rowkey)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Adding entity<{entity.GetHashCode()} to TableRepository using partitionkey:{partitionkey},rowkey:{rowkey}"); }
+            if (Configuration.TraceOnAdd)
+            {
+                Logger.LogTrace($"Adding entity<{entity.GetHashCode()} to TableRepository using partitionkey:{partitionkey},rowkey:{rowkey}");
+                    }
 
             entity.PartitionKey = partitionkey;
             entity.RowKey = rowkey;
@@ -77,14 +83,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public void Delete(TEntity entity)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Deleting entity<{entity.GetHashCode()} to TableRepository"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Deleting entity<{entity.GetHashCode()} to TableRepository"); }
 
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Deleted, Entity = entity });
 
         }
         public void Update(TEntity entity)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Updating entity<{entity.GetHashCode()} to TableRepository"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Updating entity<{entity.GetHashCode()} to TableRepository"); }
 
             this._cache.Add(new EntityStateWrapper<TEntity>() { State = EntityState.Updated, Entity = entity });
 
@@ -93,20 +99,20 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public virtual async Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Finding entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
             var op = TableOperation.Retrieve<TEntity>(partitionKey, rowKey);
             var result = await Table.ExecuteAsync(op);
             return SetCollections((TEntity)result.Result);
         }
         public Task DeleteByKey(string partitionKey, string rowKey)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Deleting entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Deleting entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
 
             return Table.ExecuteAsync(TableOperation.Delete(new TableEntity(partitionKey, rowKey) { ETag = "*" }));
         }
         public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Finding by index keys {string.Join(",", keys)}"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Finding by index keys {string.Join(",", keys)}"); }
 
             foreach (var index in Configuration.Indexes.Values.GroupBy(idx => idx.TableName?.Invoke(this.Context) ?? Configuration.TableName(this.Context) + idx.TableNamePostFix))
             {
@@ -202,11 +208,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public async Task SaveChangesAsync()
         {
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"SaveChangesAsync Running"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"SaveChangesAsync Running"); }
 
             if (!_cache.Any())
             {
-                if (Logger.IsTraceEnabled()) { Logger.Trace($"SaveChangesAsync had empty cache"); }
+                if (Configuration.TraceOnAdd) { Logger.LogTrace($"SaveChangesAsync had empty cache"); }
                 return;
             }
 
@@ -214,7 +220,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
             {
-                if (Logger.IsTraceEnabled()) { Logger.Trace($"Executing ActionBlock of batch size {batch.Length}"); }
+                if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing ActionBlock of batch size {batch.Length}"); }
 
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
@@ -277,7 +283,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
                 }
 
-                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count, Table.Name)))
+                using (new TraceTimer(Logger, string.Format("Executing operation {0} to {1}", batchOpr.Count, Table.Name)))
                 {
                     try
                     {
@@ -289,20 +295,20 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     }
                     catch (StorageException ex)
                     {
-                        Logger.TraceException("Storage Error execution", ex);
+                        Logger.LogError(new EventId(),ex,"Storage Error execution on {tableName}, {ex}",Table.Name,ex);
                         throw;
 
                     }
                     catch (Exception ex)
                     {
-                        Logger.TraceException("Error execution", ex);
+                        Logger.LogError(new EventId(), ex, "Error execution on {tableName}, {ex}", Table.Name, ex);
                         throw;
                     }
                 }
 
             }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
 
-            using (new TraceTimer("Handling Entities"))
+            using (new TraceTimer(Logger,"Handling Entities"))
             {
                 var buffer = new BufferBlock<EntityStateWrapper<TEntity>>();
                 var next = buffer;
@@ -386,7 +392,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 //          .Select(x => x.Select(v => v.Group).ToArray())
                 //          .Select(t => t.ToArray()))
                 //    {
-                //        Logger.Trace($"Posting Batch of lenght: {batch.Length}");
+                //        Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
                 //        await actionblock.SendAsync(batch);
                 //    }
 
@@ -398,7 +404,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             {
                 var batch = tuple.Item2;
                 var table = tuple.Item1;
-                if (Logger.IsTraceEnabled()) { Logger.Trace($"Executing Index ActionBlock of batch size {batch.Length}"); }
+                if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing Index ActionBlock of batch size {batch.Length}"); }
 
                 var batchOpr = new TableBatchOperation();
                 foreach (var item in batch)
@@ -423,7 +429,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     }
                 }
 
-                using (new TraceTimer(string.Format("Executing operation {0} to {1}", batchOpr.Count, table.Name)))
+                using (new TraceTimer(Logger,string.Format("Executing operation {0} to {1}", batchOpr.Count, table.Name)))
                 {
                     try
                     {
@@ -435,14 +441,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     }
                     catch (Exception ex)
                     {
-                        Logger.TraceException("Error execution", ex);
+                        Logger.LogError(new EventId(),ex,"Error execution {ex}",ex);
                         throw;
                     }
                 }
 
             }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
 
-            using (new TraceTimer("Handling Indexes"))
+            using (new TraceTimer(Logger,"Handling Indexes"))
             {
                 foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName?.Invoke(this.Context) ?? Configuration.TableName(this.Context) + idx.Entity.Config.TableNamePostFix))
                 {
@@ -455,7 +461,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                           .Select(x => x.Select(v => v.Group).ToArray())
                           .Select(t => t.ToArray()))
                         {
-                            Logger.Trace($"Posting Batch of lenght: {batch.Length}");
+                            Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
                             await block.SendAsync(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>(indexTable, batch));
                         }
 
@@ -487,7 +493,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             entity.PartitionKey = mapper.PartitionKeyMapper(entity);
             entity.RowKey = mapper.RowKeyMapper(entity);
-            if (Logger.IsTraceEnabled()) { Logger.Trace($"Setting Keys for Entity<{entity.GetHashCode()}>[{entity.PartitionKey}|{entity.RowKey}]"); }
+            if (Configuration.TraceOnAdd) { Logger.LogTrace($"Setting Keys for Entity<{entity.GetHashCode()}>[{entity.PartitionKey}|{entity.RowKey}]"); }
             return entity;
         }
 
@@ -495,7 +501,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         {
             if (item.PartitionKey == null)
             {
-                Logger.Fatal(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType, d.Value.PropertyAsObject))));
+                Logger.LogCritical(string.Join("\n", item.WriteEntity(null).Select(d => string.Format("{0} {1} {2}", d.Key, d.Value.PropertyType, d.Value.PropertyAsObject))));
                 throw new NullReferenceException("The partionKey was not set");
             }
 

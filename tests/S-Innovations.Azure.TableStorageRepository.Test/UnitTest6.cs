@@ -7,7 +7,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Linq;
 using SInnovations.Azure.TableStorageRepository.Queryable;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Configuration;
 using Serilog.Events;
@@ -30,15 +30,16 @@ namespace SInnovations.Azure.TableStorageRepository.Test
    
     public class Test6Context : TableStorageContext
     {
+        static EntityTypeConfigurationsContainer container = new EntityTypeConfigurationsContainer(new LoggerFactory());
         static Test6Context()
         {
-            Table.SetInitializer(new CreateTablesIfNotExists<Test6Context>());
+            Table.SetInitializer(new CreateTablesIfNotExists<Test6Context>(container));
 
         }
 
 
         public Test6Context(CloudStorageAccount account)
-            : base( account)
+            : base(new LoggerFactory(),container, account)
         {
 
             

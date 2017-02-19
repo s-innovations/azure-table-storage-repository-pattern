@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net452</TargetFrameworks>
+    <RootNamespace>SInnovations.Azure.TableStorageRepository.Spatial.DotSpatial</RootNamespace>
+    <AssemblyName>S-Innovations.Azure.TableStorageRepository.Spatial.DotSpatial</AssemblyName>
+    <Version>4.0.0-pre</Version>
+    <Company>S-Innovations v/Poul K. Sørensen</Company>
+    <Authors>Poul K. Sørensen</Authors>
+    <FileVersion>4.0.0.0</FileVersion>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\S-Innovations.Azure.TableStorageRepository.Spatial\TableStorageRepository.Spatial.csproj" />
+    <ProjectReference Include="..\S-Innovations.Azure.TableStorageRepository\TableStorageRepository.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="1.1.0" />
+    <PackageReference Include="DotSpatial.Serialization" Version="1.9"  />
+    <PackageReference Include="DotSpatial.Topology" Version="1.9" />
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1"  />
+  </ItemGroup>
+</Project>

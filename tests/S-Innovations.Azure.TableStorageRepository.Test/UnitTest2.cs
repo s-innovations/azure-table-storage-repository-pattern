@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using SInnovations.Azure.TableStorageRepository;
+using Microsoft.Extensions.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -50,8 +51,11 @@ namespace SInnovations.Azure.TableStorageRepository.Test
     }
     public class NewTableStorageContext : TableStorageContext
     {
+
+        static EntityTypeConfigurationsContainer container = new EntityTypeConfigurationsContainer(new LoggerFactory());
+
         public NewTableStorageContext()
-            : base(new CloudStorageAccount(
+            : base(new LoggerFactory(),container,new CloudStorageAccount(
             new StorageCredentials("c1azuretests",File.ReadAllText("C:\\dev\\storagekey.txt")), true))
         {
 

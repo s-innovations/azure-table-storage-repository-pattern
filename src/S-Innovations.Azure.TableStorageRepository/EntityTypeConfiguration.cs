@@ -1,6 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections;
@@ -86,7 +86,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         }
 
-        private static MethodInfo QueryFilterMethod = typeof(CollectionConfiguration).GetMethod("GetFilterQuery");
+        private static MethodInfo QueryFilterMethod = typeof(CollectionConfiguration).GetTypeInfo().GetDeclaredMethod("GetFilterQuery");
         internal void SetCollection(object obj, ITableStorageContext context)
         {
 
@@ -245,14 +245,14 @@ namespace SInnovations.Azure.TableStorageRepository
     }
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
-        private static ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
 
         private static Action<TEntityType, IDictionary<string, EntityProperty>, string> EmptyReverseAction = (_, __, ___) => { };
         Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression;
         Func<IDictionary<string, EntityProperty>, TEntityType> CtorExpression;
-        public EntityTypeConfiguration()
+        public EntityTypeConfiguration(ILoggerFactory factory)
         {
-
+            this.Logger = factory.CreateLogger<EntityTypeConfiguration<TEntityType>>();
         }
 
 
@@ -320,7 +320,7 @@ namespace SInnovations.Azure.TableStorageRepository
             if (!string.IsNullOrEmpty(rowKey))
                 this.KeyMappings.Add(rowKey, "RowKey");
 
-            Logger.DebugFormat("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
+            Logger.LogDebug("Created Key Mapper: PartionKey: {0}, RowKey: {1}", partitionKey, rowKey);
 
             Action<TEntityType, IDictionary<string, EntityProperty>, string> partitionAction = GetReverseActionFrom<TPartitionKey>(PartitionKeyExpression);
             Action<TEntityType, IDictionary<string, EntityProperty>, string> rowAction = RowKeyExpression == null ? (e, d, s) => { } : GetReverseActionFrom<TRowKey>(RowKeyExpression);
@@ -384,7 +384,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     
                     //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
-                    PropertyInfo property = type.GetProperty(newEx.Members[i].Name);
+                    PropertyInfo property = type.GetRuntimeProperty(newEx.Members[i].Name);
                     if (IgnoreKeyPropertyRemovables.ContainsKey(newEx.Members[i].Name))
                         property = null;
 
@@ -487,9 +487,11 @@ namespace SInnovations.Azure.TableStorageRepository
         public EntityTypeConfiguration<TEntityType> WithEnumProperties()
         {
             //      var type = typeof(PropertyConfiguration<>);
-            var fact = this.GetType().GetMethod("PropertyConfigurationFactory", BindingFlags.Static | BindingFlags.NonPublic);
+            //var fact = this.GetType().GetMethod("PropertyConfigurationFactory", BindingFlags.Static | BindingFlags.NonPublic);
+            var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactory");
 
-            foreach (var prop in typeof(TEntityType).GetProperties().Where(p => p.PropertyType.IsEnum))
+
+            foreach (var prop in typeof(TEntityType).GetRuntimeProperties().Where(p => p.PropertyType.GetTypeInfo().IsEnum))
             {
                 PropertyConfiguration config = (PropertyConfiguration)fact.MakeGenericMethod(prop.PropertyType).Invoke(null, null);
                 config.PropertyInfo = prop;
@@ -502,7 +504,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public EntityTypeConfiguration<TEntityType> WithUriProperties()
         {
-            foreach (var prop in typeof(TEntityType).GetProperties().Where(p => p.PropertyType == typeof(Uri)))
+            foreach (var prop in typeof(TEntityType).GetRuntimeProperties().Where(p => p.PropertyType == typeof(Uri)))
             {
                 this.Properties.Add(new PropertyConfiguration<TEntityType,Uri>
                 {
@@ -693,7 +695,7 @@ namespace SInnovations.Azure.TableStorageRepository
             }
             else if (expression.Body is NewExpression)
             {
-                Logger.Debug("Using NewExpressino for KeyMapping");
+                Logger.LogDebug("Using NewExpressino for KeyMapping");
                 var newEx = expression.Body as NewExpression;
                 key = string.Join(TableStorageContext.KeySeparator, newEx.Members.Select(m => m.Name));
                 var properties = newEx.Members.OfType<PropertyInfo>().ToArray();
@@ -761,7 +763,7 @@ namespace SInnovations.Azure.TableStorageRepository
         }
         public static bool IsStringConvertable(Type type)
         {
-            return type.IsPrimitive || type == typeof(string) || type == typeof(Guid);
+            return type.GetTypeInfo().IsPrimitive || type == typeof(string) || type == typeof(Guid);
         }
 
         Func<ITableStorageContext, string, EntityProperty, IDictionary<string, EntityProperty>, Task<SizeReductionResult>> reducer;
@@ -770,7 +772,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             if (reducer == null)
             {
-                Trace.TraceWarning("SizeReducer was called for {0} but no reducer was set.", key);
+                Logger.LogWarning("SizeReducer was called for {0} but no reducer was set.", key);
                 return Task.FromResult(new SizeReductionResult { Key = key, Value = value });
             }
             return reducer(context, key, value, properties);

@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.DataInitializers;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
@@ -15,7 +16,7 @@ namespace SInnovations.Azure.TableStorageRepository
 {
     internal static class Factory
     {
-        internal static MethodInfo EntityConfigTypeMethod = typeof(EntityTypeConfigurationsContainer).GetMethods().Single(x => x.IsGenericMethod && x.Name == "Entity");
+        internal static MethodInfo EntityConfigTypeMethod = typeof(EntityTypeConfigurationsContainer).GetRuntimeMethods().Single(x => x.IsGenericMethod && x.Name == "Entity");
         internal static Type TablePocoRepositoryType = typeof(TablePocoRepository<>);
         internal static Type EntityConfigurationType = typeof(EntityTypeConfiguration<>);
         internal static Type LazyType = typeof(Lazy<>);
@@ -32,9 +33,8 @@ namespace SInnovations.Azure.TableStorageRepository
                         ctx, 
                         Activator.CreateInstance( //Lazy<EntityTypeConfiguration<EntityType>>
                             lazyType, 
-                            new Object[]{ 
-                                Delegate.CreateDelegate(FuncType.MakeGenericType(EntityConfigType),
-                                EntityConfigTypeMethod.MakeGenericMethod(EntityType))
+                            new Object[]{
+                                EntityConfigTypeMethod.MakeGenericMethod(EntityType).GetRuntimeBaseDefinition().CreateDelegate(FuncType.MakeGenericType(EntityConfigType),null)
                             }) 
                     };
 
@@ -60,6 +60,10 @@ namespace SInnovations.Azure.TableStorageRepository
    }
     public abstract class TableStorageContext : ITableStorageContext
     {
+        private readonly ILogger Logger;
+        private readonly ILoggerFactory logFactory;
+        private readonly IEntityTypeConfigurationsContainer container;
+
         public int MaxDegreeOfParallelism { get; set; } = 10;
         public CloudStorageAccount StorageAccount {get; private set;}
         private static object _buildLock = new object();
@@ -71,52 +75,18 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public bool AutoSaveOnDispose { get; set; }
         private static object _lock = new object();
-        public TableStorageContext(CloudStorageAccount storage)
+        public TableStorageContext(ILoggerFactory logFactory, IEntityTypeConfigurationsContainer container, CloudStorageAccount storage)
         {
+            this.logFactory = logFactory;
+            Logger = logFactory.CreateLogger<TableStorageContext>();
             StorageAccount = storage;
             _client = new Lazy<CloudTableClient>(CreateClient);
 
 
-            TableStorageModelBuilder builder =
-                EntityTypeConfigurationsContainer.ModelBuilders.GetOrAdd(
-                    this.GetType(), (key) => new Lazy<TableStorageModelBuilder>(() =>
-                    {
-                        var abuilder = new TableStorageModelBuilder();
-                        abuilder.Builder = () =>
-                        {
-
-                            OnModelCreating(abuilder);
-                            if (Table.inits.ContainsKey(this.GetType()))
-                            {
-                                var init = Table.inits[this.GetType()];
-                                init.Initialize(this, abuilder);
-                                Table.inits.Remove(this.GetType());
-                            }
-                        };
-                        return abuilder;
-                    }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
-            //TableStorageModelBuilder builder;
-            //if (EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()))
-            //    EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder);
-            //else
-            //{
-            //    lock(_lock)
-            //    {
-            //        //Check that if it was added
-            //        if (!(EntityTypeConfigurationsContainer.ModelBuilders.ContainsKey(this.GetType()) 
-            //            && EntityTypeConfigurationsContainer.ModelBuilders.TryGetValue(this.GetType(), out builder)))
-            //        {
-            //            builder = new TableStorageModelBuilder();
-
-            //            OnModelCreating(builder, modelBuilderParams);
-            //            EntityTypeConfigurationsContainer.ModelBuilders.TryAdd(this.GetType(), builder);
-            //        }
-            //    }
-            //}
-
-
+            TableStorageModelBuilder builder = container.GetModelBuilder(this, OnModelCreating);
+               
             //How long time does it take.
-            using (new TraceTimer("Using reflection to set propeties.") { TraceLevel = System.Diagnostics.TraceLevel.Verbose, Threshold = 0 })
+            using (new TraceTimer(Logger,"Using reflection to set propeties.") { TraceLevel = Microsoft.Extensions.Logging.LogLevel.Trace, Threshold = 0 })
             {
                 BuildModel(builder);
 
@@ -159,9 +129,9 @@ namespace SInnovations.Azure.TableStorageRepository
         private void BuildModel(TableStorageModelBuilder modelbuilder)
         {
          
-            foreach(var repository in this.GetType().GetProperties().Where(p=>p.PropertyType.IsGenericType))
+            foreach(var repository in this.GetType().GetRuntimeProperties().Where(p=>p.PropertyType.GetTypeInfo().IsGenericType))
             {
-                if (typeof(ITableRepository<>).IsAssignableFrom(repository.PropertyType.GetGenericTypeDefinition()))
+                if (typeof(ITableRepository<>).GetTypeInfo().IsAssignableFrom(repository.PropertyType.GetGenericTypeDefinition().GetTypeInfo()))
                 {
                     var EntityType = repository.PropertyType.GenericTypeArguments[0];
                     var rep = Factory.RepositoryFactory(this, EntityType);
@@ -190,7 +160,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public CloudTable GetTable<T1>()
         {
-            return _client.Value.GetTableReference(EntityTypeConfigurationsContainer.Entity<T1>().TableName(this));
+            return _client.Value.GetTableReference(container.Entity<T1>().TableName(this));
         }
 
 

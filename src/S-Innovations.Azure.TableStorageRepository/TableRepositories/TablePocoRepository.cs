@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.Queryable;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
@@ -21,21 +22,21 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            ITableRepository<TEntity>
     {
 
-       
+        private readonly ILogger Logger;
         private readonly Expression _expression;
         public new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
-        public TablePocoRepository(ITableStorageContext context, Lazy<EntityTypeConfiguration<TEntity>> configuration)
-            : base(context, new Lazy<EntityTypeConfiguration>(() => configuration.Value))
+        public TablePocoRepository(ILoggerFactory logFactory, ITableStorageContext context, Lazy<EntityTypeConfiguration<TEntity>> configuration)
+            : base(logFactory,context, new Lazy<EntityTypeConfiguration>(() => configuration.Value))
         {
-
+            this.Logger = logFactory.CreateLogger<TablePocoRepository<TEntity>>();
             _expression = Expression.Constant(this);
-            _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(this, configuration.Value));
+            _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(logFactory,this, configuration.Value));
         }
-        public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
-        {
-            return Table.CreateQuery<T>();            
-        }
+        //public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
+        //{
+        //    return Table.que.CreateQuery<T>();            
+        //}
 
         protected override EntityAdapter<TEntity> SetKeys(EntityAdapter<TEntity> entity, bool keysLocked)
         {
@@ -74,8 +75,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             }catch(Exception ex)
             {
-                Trace.TraceError(entity.PartitionKey);
-                Trace.TraceError(entity.RowKey);
+                Logger.LogError(new EventId(),ex, entity.PartitionKey +" " + entity.RowKey);
+                
                 throw;
             }
             return entity;
@@ -100,7 +101,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             };
 
           
-            return Table.ExecuteQuery(query);
+            return Table.ExecuteQueryAsync(query).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -134,7 +135,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public TableResult Execute(TableOperation operation)
         {
-            return Table.Execute(operation);
+            return Table.ExecuteAsync(operation).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -149,7 +150,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public Task<TableResult> ExecuteAsync(TableOperation operation, CancellationToken cancellationToken)
         {
-            return Table.ExecuteAsync(operation, cancellationToken);
+            return Table.ExecuteAsync(operation, null,null,cancellationToken);
         }
 
         /// <summary>
@@ -166,7 +167,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public IList<TableResult> ExecuteBatch(TableBatchOperation batch)
         {
-            return Table.ExecuteBatch(batch);
+            return Table.ExecuteBatchAsync(batch).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -183,7 +184,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         public Task<IList<TableResult>> ExecuteBatchAsync(TableBatchOperation tableBatchOperation, CancellationToken cancellationToken)
         {
-            return Table.ExecuteBatchAsync(tableBatchOperation, cancellationToken);
+            return Table.ExecuteBatchAsync(tableBatchOperation,null,null, cancellationToken);
         }
 
 

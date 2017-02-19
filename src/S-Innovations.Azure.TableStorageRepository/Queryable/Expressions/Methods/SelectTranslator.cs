@@ -96,7 +96,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
 
         private void AddPostProcessing(MethodCallExpression method, ITranslationResult result)
         {
-            Type type = method.Arguments[0].Type.GetGenericArguments()[0];
+            Type type = method.Arguments[0].Type.GenericTypeArguments[0];
             ParameterExpression parameter = Expression.Parameter(typeof(IQueryable<>).MakeGenericType(type), null);
             MethodCallExpression call = Expression.Call(method.Method, parameter, method.Arguments[1]);
 

@@ -1,5 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.Queryable.Base;
 using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace SInnovations.Azure.TableStorageRepository.Queryable
 {
@@ -51,7 +52,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <summary>
         /// The logger
         /// </summary>
-        private readonly static ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
 
 
         private readonly TablePocoRepository<TEntity> _repository;
@@ -63,7 +64,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// </summary>
         /// <param name="cloudTable">Cloud table.</param>
         /// <param name="entityConverter"></param>
-        internal TableQueryProvider(TablePocoRepository<TEntity> cloudTable, EntityTypeConfiguration<TEntity> entityConverter)
+        internal TableQueryProvider(ILoggerFactory logfactory, TablePocoRepository<TEntity> cloudTable, EntityTypeConfiguration<TEntity> entityConverter)
         {
             if (cloudTable == null)
             {
@@ -75,9 +76,11 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                 throw new ArgumentNullException("entityConverter");
             }
 
+            Logger = logfactory.CreateLogger<TableQueryProvider<TEntity>>();
+
             _repository = cloudTable;
             _entityConfiguration = entityConverter;
-            _queryTranslator = new QueryTranslator(entityConverter);
+            _queryTranslator = new QueryTranslator(logfactory, entityConverter);
         }
 
         /// <summary>
@@ -141,19 +144,19 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             {
                 throw new ArgumentNullException("expression");
             }
-            Logger.Debug("Translating Async Expression");
+            Logger.LogDebug("Translating Async Expression");
 
             var result = new TranslationResult();
 
             _queryTranslator.Translate(expression, result);
             
             AddCollectionPropertiesFilters(result);
-            Logger.DebugFormat("Executing Async Expression : {0}, {1}, {2}",
+            Logger.LogDebug("Executing Async Expression : {0}, {1}, {2}",
                 result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns??Enumerable.Empty<string>()));
 
         
             return _repository
-                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)
+                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery,cancellationToken)
                 .Then(p => GetProcessedResult(p, result), cancellationToken);
         }
 
@@ -165,7 +168,18 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <returns>Collection of entities.</returns>
         private object GetProcessedResult(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
         {
-            IEnumerable<TEntity> result = tableEntities.Select(q => KeepState(q));
+            var block = new TransformBlock<EntityAdapter<TEntity>, TEntity>(async (adapter) =>
+            {
+                return await KeepState(adapter);
+
+            });
+            foreach(var adapter in tableEntities) { block.Post(adapter); }
+            block.Complete();
+            block.Completion.Wait();
+
+            IList<TEntity> result;
+            block.TryReceiveAll(out result);
+            //IEnumerable<TEntity> result = tableEntities.Select(q => KeepState(q));
 
             if (translation.PostProcessing == null)
             {
@@ -182,19 +196,21 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             }
         }
 
-        private TEntity KeepState(EntityAdapter<TEntity> entity)
+        private async Task<TEntity> KeepState(EntityAdapter<TEntity> entity)
         {
             //foreach (var entity in enumerable)
-          //  {
-                //TODO: key should properly be row+part key
-             //   _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
+            //  {
+            //TODO: key should properly be row+part key
+            //   _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
             //        (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
-            
+
             //Set properties that infact are the part/row key
-         //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
-        //    }
-        //        return enumerable;
-                return entity.InnerObject;
+            //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
+            //    }
+            //        return enumerable;
+            await entity.PostReadEntityAsync(_entityConfiguration);
+
+            return entity.InnerObject;
         }
     }
 }

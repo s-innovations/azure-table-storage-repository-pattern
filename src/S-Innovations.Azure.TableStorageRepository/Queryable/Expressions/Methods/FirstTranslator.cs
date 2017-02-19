@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,8 +13,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
     /// </summary>
     internal sealed class FirstTranslator : MethodTranslatorBase
     {
-        public FirstTranslator(EntityTypeConfiguration configuration)
-            : base(configuration, "First")
+        public FirstTranslator(ILoggerFactory factory,EntityTypeConfiguration configuration)
+            : base(factory,configuration, "First")
         {
         }
 

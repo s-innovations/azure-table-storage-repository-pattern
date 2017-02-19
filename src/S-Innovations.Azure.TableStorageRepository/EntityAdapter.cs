@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
+using Microsoft.Extensions.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -64,7 +65,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             // If you would like to work with objects that do not have a default Ctor you can use (T)Activator.CreateInstance(typeof(T));
             //   this.InnerObject = new T();
-            this.config = EntityTypeConfigurationsContainer.Entity<TEntity>();
+           // this.config = EntityTypeConfigurationsContainer.Entity<TEntity>();
         }
 
         internal EntityAdapter(ITableStorageContext context, EntityTypeConfiguration<TEntity> config, TEntity innerObject, DateTimeOffset? timestamp = null, string Etag = null)
@@ -114,35 +115,40 @@ namespace SInnovations.Azure.TableStorageRepository
         /// <value>The ETag of the entity.</value>
         public string ETag { get; set; }
 
-        public virtual void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+        private OperationContext operationContext;
+        public virtual async Task PostReadEntityAsync(EntityTypeConfiguration<TEntity> config)
         {
+            this.config = config;
             //Create the Entity Object Type
-            this.InnerObject = config.CreateEntity(properties);
+            this.InnerObject = config.CreateEntity(Properties);
             //Read all default supported types from table entity
-            TableEntity.ReadUserObject(this.InnerObject, properties, operationContext);
+            TableEntity.ReadUserObject(this.InnerObject, Properties, operationContext);
 
             //Read all custom properties configured.
             var tasks = new List<Task>();
             foreach (var propInfo in config.Properties)
             {
-                if (properties.ContainsKey(propInfo.PropertyInfo.Name))
+                if (Properties.ContainsKey(propInfo.PropertyInfo.Name))
                 {
-                    var prop = properties[propInfo.PropertyInfo.Name];
+                    var prop = Properties[propInfo.PropertyInfo.Name];
                     tasks.Add(propInfo.SetPropertyAsync(this.InnerObject, prop));
                 }
                 else if (propInfo.IsComposite)
                 {
-                    tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, properties.Where(k => k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k => k.Key.Substring(propInfo.PropertyInfo.Name.Length + 2), v => v.Value)));
+                    tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, Properties.Where(k => k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k => k.Key.Substring(propInfo.PropertyInfo.Name.Length + 2), v => v.Value)));
                 }
             }
-            Task.WaitAll(tasks.ToArray());
+
+            await Task.WhenAll(tasks.ToArray());
+            //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
+            config.ReverseKeyMapping(this);
+        }
+        public virtual void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+        {
 
             //Set the properties
             Properties = properties;
-
-            //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
-            config.ReverseKeyMapping(this);
-
+            this.operationContext = operationContext;
 
         }
 

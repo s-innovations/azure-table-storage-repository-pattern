@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SInnovations.Azure.TableStorageRepository.Logging;
+﻿using Microsoft.Extensions.Logging;
+using System;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -13,12 +8,12 @@ namespace SInnovations.Azure.TableStorageRepository
     /// </summary>
     public class TraceTimer : IDisposable
     {
-        private ILog Logger = LogProvider.GetCurrentClassLogger();
-
+        private readonly ILogger Logger;
+        
         /// <summary>
         /// Set the TraceLevel that should be written to, default is verbose.
         /// </summary>
-        public TraceLevel TraceLevel { get; set; }
+        public LogLevel TraceLevel { get; set; }
         /// <summary>
         /// If a value is set then the trace will only be written if it takes longer than the threshold.
         /// </summary>
@@ -32,12 +27,13 @@ namespace SInnovations.Azure.TableStorageRepository
         /// </summary>
         public DateTime Start { get; private set; }
 
-        public TraceTimer(string action)
+        public TraceTimer(ILogger logger, string action)
         {
             _action = action;
             Start = DateTime.Now;
-            TraceLevel = TraceLevel.Verbose;
+            TraceLevel = LogLevel.Trace;
             Threshold = 0;
+            this.Logger = logger;
 
 
         }
@@ -54,27 +50,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             time = (DateTime.Now - Start).TotalMilliseconds;
             if (time > Threshold)
-                switch (TraceLevel)
-                {
-                    case TraceLevel.Error:
-                        Logger.Error(TraceString(_action));
-                       // Trace.TraceError(TraceString(_action));
-                        break;
-                    case TraceLevel.Info:
-                        Logger.Info(TraceString(_action));
-                    //    Trace.TraceInformation(TraceString(_action));
-                        break;
-                    case TraceLevel.Warning:
-                        Logger.Warn(TraceString(_action));
-                       // Trace.TraceWarning(TraceString(_action));
-                        break;
-                    default:
-                        Logger.Trace(TraceString(_action));
-                   //     Trace.WriteLine(TraceString(_action), "Verbose");
-                        break;
-                }
-
-
+                Logger.Log<object>(TraceLevel, new EventId(), null, null, (s, e) => TraceString(_action));
 
         }
     }

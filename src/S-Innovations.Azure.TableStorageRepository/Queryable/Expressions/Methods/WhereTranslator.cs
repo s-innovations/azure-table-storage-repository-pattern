@@ -1,4 +1,5 @@
-﻿using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infrastructure;
+﻿using Microsoft.Extensions.Logging;
+using SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +16,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
         private const string MethodName = "Where";
         //private readonly IDictionary<string, string> _nameChanges;
         EntityTypeConfiguration _configuration;
+        private readonly ILoggerFactory logFactory;
 
-        public WhereTranslator(EntityTypeConfiguration configuration)
+        public WhereTranslator(ILoggerFactory logFactory, EntityTypeConfiguration configuration)
         {
             //_nameChanges = nameChanges;
             _configuration= configuration;
+            this.logFactory = logFactory;
         }
 
         public string Name
@@ -35,7 +38,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Method
                 throw new ArgumentOutOfRangeException("method", message);
             }
 
-            var expressionTranslator = new ExpressionTranslator(_configuration);
+            var expressionTranslator = new ExpressionTranslator(logFactory, _configuration);
             expressionTranslator.Translate(result, method);
         }
     }

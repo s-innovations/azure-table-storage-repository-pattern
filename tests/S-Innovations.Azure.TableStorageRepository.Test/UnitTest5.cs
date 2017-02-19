@@ -6,6 +6,7 @@ using SInnovations.Azure.TableStorageRepository.DataInitializers;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace SInnovations.Azure.TableStorageRepository.Test
 {
@@ -20,16 +21,16 @@ namespace SInnovations.Azure.TableStorageRepository.Test
     }
     public class ProductContext : TableStorageContext
     {
-
+        static EntityTypeConfigurationsContainer container = new EntityTypeConfigurationsContainer(new LoggerFactory());
         static ProductContext()
         {
             //TO DROP THE TEST TABLE USE COMMENTED LINE. Dont use in production :)
-            Table.SetInitializer(new CreateTablesIfNotExists<ProductContext>());
+            Table.SetInitializer(new CreateTablesIfNotExists<ProductContext>(container));
            // Table.SetInitializer(new DropTablesAndCreateIfExist<ProductContext>());
             
         }
         public ProductContext()
-            : base(CloudStorageAccount.Parse(File.ReadAllText(@"c:\dev\teststorage.txt")))
+            : base(new LoggerFactory(),container,CloudStorageAccount.Parse(File.ReadAllText(@"c:\dev\teststorage.txt")))
         {
           
             this.InsertionMode = InsertionMode.AddOrMerge;

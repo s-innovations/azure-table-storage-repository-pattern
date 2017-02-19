@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,7 +17,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Base
         {
             Type ienum = FindIEnumerable(seqType);
             if (ienum == null) return seqType;
-            return ienum.GetGenericArguments()[0];
+            return ienum.GetTypeInfo().GenericTypeParameters[0];
         }
 
         private static Type FindIEnumerable(Type seqType)
@@ -31,19 +32,19 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Base
                 return EnumerableType.MakeGenericType(seqType.GetElementType());
             }
 
-            if (seqType.IsGenericType)
+            if (seqType.GetTypeInfo().IsGenericType)
             {
-                foreach (Type arg in seqType.GetGenericArguments())
+                foreach (Type arg in seqType.GetTypeInfo().GenericTypeParameters)
                 {
                     Type ienum = EnumerableType.MakeGenericType(arg);
-                    if (ienum.IsAssignableFrom(seqType))
+                    if (ienum.GetTypeInfo().IsAssignableFrom(seqType.GetTypeInfo()))
                     {
                         return ienum;
                     }
                 }
             }
 
-            Type[] ifaces = seqType.GetInterfaces();
+            Type[] ifaces = seqType.GetTypeInfo().ImplementedInterfaces.ToArray();
             if (ifaces.Length > 0)
             {
                 foreach (Type iface in ifaces)
@@ -56,9 +57,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Base
                 }
             }
 
-            if (seqType.BaseType != null && seqType.BaseType != ObjectType)
+            if (seqType.GetTypeInfo().BaseType != null && seqType.GetTypeInfo().BaseType != ObjectType)
             {
-                return FindIEnumerable(seqType.BaseType);
+                return FindIEnumerable(seqType.GetTypeInfo().BaseType);
             }
 
             return null;

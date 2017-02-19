@@ -1,5 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
-using SInnovations.Azure.TableStorageRepository.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -27,7 +27,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             public string PropertyName { get; set; }
             public bool StartsWith { get;  set; }
         }
-        static readonly ILog Logger = LogProvider.GetCurrentClassLogger();
+        private readonly ILogger Logger;
 
         private readonly ExpressionEvaluator _constantEvaluator;
         private readonly IDictionary<string, string> _nameChanges;
@@ -41,8 +41,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
         ///     Constructor.
         /// </summary>
         /// <param name="nameChanges"></param>
-        internal ExpressionTranslator(EntityTypeConfiguration configuration)
+        internal ExpressionTranslator(ILoggerFactory logFactory,EntityTypeConfiguration configuration)
         {
+            Logger = logFactory.CreateLogger<ExpressionTranslator>();
             //_nameChanges = nameChanges;
             _configuration = configuration;
             _nameChanges = configuration.KeyMappings;
@@ -159,12 +160,12 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
 
         public void AddPostProcessing(MethodCallExpression method)
         {
-            Type type = method.Arguments[0].Type.GetGenericArguments()[0];
+            Type type = method.Arguments[0].Type.GenericTypeArguments[0];
             Type genericType = typeof(IQueryable<>).MakeGenericType(type);
 
             ParameterExpression parameter = Expression.Parameter(genericType, null);
             MethodInfo methodInfo = typeof(System.Linq.Queryable)
-                .GetMethods()
+                .GetRuntimeMethods()
                 .Single(p => p.Name == method.Method.Name && p.GetParameters().Length == 1)
                 .MakeGenericMethod(type);
 
@@ -249,7 +250,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 {
                     return binary;
                 }
-                Logger.WarnFormat("Please report this if you see it in your logs, ID:F68BA48F-DA61-4DEB-A078-5D10F722E324");
+                Logger.LogWarning("Please report this if you see it in your logs, ID:F68BA48F-DA61-4DEB-A078-5D10F722E324");
             }
             else
             {
@@ -643,7 +644,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 if (result.NodeType != ExpressionType.Constant)
                 {
                     string message = String.Format("Resources.TranslatorUnableToEvaluateExpression {0}", node);
-                    throw new InvalidExpressionException(message);
+                    throw new InvalidOperationException(message);
                 }
 
                 node = result;
