@@ -22,19 +22,20 @@ namespace SInnovations.Azure.TableStorageRepository
         internal static Type LazyType = typeof(Lazy<>);
         internal static Type FuncType = typeof(Func<>);
 
-        public static ITableRepository RepositoryFactory(ITableStorageContext ctx, Type EntityType)
+        public static ITableRepository RepositoryFactory(ILoggerFactory loggerFactory, IEntityTypeConfigurationsContainer container, ITableStorageContext ctx, Type EntityType)
         {
             // var TableRepositoryType = IsEntityType ? TableEntityRepositoryType : TablePocoRepositoryType;
 
             var EntityConfigType = EntityConfigurationType.MakeGenericType(EntityType);
             var lazyType = LazyType.MakeGenericType(EntityConfigType);
             var argumetns = new Object[] 
-                    { 
-                        ctx, 
+                    {
+                        loggerFactory,
+                        ctx,                         
                         Activator.CreateInstance( //Lazy<EntityTypeConfiguration<EntityType>>
                             lazyType, 
                             new Object[]{
-                                EntityConfigTypeMethod.MakeGenericMethod(EntityType).GetRuntimeBaseDefinition().CreateDelegate(FuncType.MakeGenericType(EntityConfigType),null)
+                                EntityConfigTypeMethod.MakeGenericMethod(EntityType).CreateDelegate(FuncType.MakeGenericType(EntityConfigType),container)
                             }) 
                     };
 
@@ -45,9 +46,9 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return rep;
         }
-        public static ITableRepository<TEntity> RepositoryFactory<TEntity>(ITableStorageContext ctx)
+        public static ITableRepository<TEntity> RepositoryFactory<TEntity>(ILoggerFactory factory, IEntityTypeConfigurationsContainer container, ITableStorageContext ctx)
         {
-            return RepositoryFactory(ctx, typeof(TEntity)) as ITableRepository<TEntity>;
+            return RepositoryFactory(factory, container,ctx, typeof(TEntity)) as ITableRepository<TEntity>;
         }
 
 
@@ -77,6 +78,7 @@ namespace SInnovations.Azure.TableStorageRepository
         private static object _lock = new object();
         public TableStorageContext(ILoggerFactory logFactory, IEntityTypeConfigurationsContainer container, CloudStorageAccount storage)
         {
+            this.container = container;
             this.logFactory = logFactory;
             Logger = logFactory.CreateLogger<TableStorageContext>();
             StorageAccount = storage;
@@ -134,7 +136,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 if (typeof(ITableRepository<>).GetTypeInfo().IsAssignableFrom(repository.PropertyType.GetGenericTypeDefinition().GetTypeInfo()))
                 {
                     var EntityType = repository.PropertyType.GenericTypeArguments[0];
-                    var rep = Factory.RepositoryFactory(this, EntityType);
+                    var rep = Factory.RepositoryFactory(logFactory, container,this, EntityType);
                   
                     repositories.Add(rep);
                     repository.SetValue(this, rep);

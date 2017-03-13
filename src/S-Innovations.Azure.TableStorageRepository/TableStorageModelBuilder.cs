@@ -43,7 +43,7 @@ namespace SInnovations.Azure.TableStorageRepository
                             OnModelCreating(abuilder);
                             if (Table.inits.ContainsKey(key))
                             {
-                                var init = Table.inits[this.GetType()];
+                                var init = Table.inits[key];
                                 init.Initialize(context, abuilder);
                                 Table.inits.Remove(key);
                             }
@@ -61,7 +61,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     if (!Configurations.ContainsKey(typeof(TEntityType)))
                     {
-                        Configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>(_factory));
+                        Configurations.TryAdd(typeof(TEntityType), new EntityTypeConfiguration<TEntityType>(_factory,this));
                         foreach (var value in ModelBuilders.Values.Where(v => v.Value.Entities == null))
                             value.Value.Builder();
                     }

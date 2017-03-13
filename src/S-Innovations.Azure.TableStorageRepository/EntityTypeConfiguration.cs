@@ -246,12 +246,16 @@ namespace SInnovations.Azure.TableStorageRepository
     public class EntityTypeConfiguration<TEntityType> : EntityTypeConfiguration
     {
         private readonly ILogger Logger;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly IEntityTypeConfigurationsContainer _container;
 
         private static Action<TEntityType, IDictionary<string, EntityProperty>, string> EmptyReverseAction = (_, __, ___) => { };
         Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression;
         Func<IDictionary<string, EntityProperty>, TEntityType> CtorExpression;
-        public EntityTypeConfiguration(ILoggerFactory factory)
+        public EntityTypeConfiguration(ILoggerFactory factory, IEntityTypeConfigurationsContainer container)
         {
+            _loggerFactory = factory;
+            _container = container;
             this.Logger = factory.CreateLogger<EntityTypeConfiguration<TEntityType>>();
         }
 
@@ -642,7 +646,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 var memberEx = expression.Body as MemberExpression;
 
                 Func<ITableStorageContext, ITableRepository<T>> activator =
-                    (ctx) => Factory.RepositoryFactory<T>(ctx);
+                    (ctx) => Factory.RepositoryFactory<T>(_loggerFactory,_container,ctx);
 
                 //this.builder.Entity<TEntityType>()                 
                 this.Collections.Add(new CollectionConfiguration
@@ -730,8 +734,8 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 key = "";
             }
-
-            return (a) => "";
+            return (a)=> func(a).ToString();
+           // return (a) => "";
 
         }
        
