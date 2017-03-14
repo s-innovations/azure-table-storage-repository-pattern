@@ -78,6 +78,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             if (_keyFilters.Any())
             {
 
+               
+
 
                 var filter = new StringBuilder();
 
@@ -97,11 +99,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     if (!_nameChanges.Keys.Any(k => k.StartsWith(key.PropertyName)))
                         throw new Exception("Make sure that all the filters are used when having hasKeys(p=new { p.p1, p.p2}) ");
 
+                    var properties = _nameChanges.FirstOrDefault(kv => kv.Value == key.Key).Key; //.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    var startswith = key.HasStartsWith || properties != key.PropertyName;
+
                     if (i > 0)
                         filter.Append(" and ");
 
 
-                    if (!key.HasStartsWith)
+                    if (!startswith)
                     {
                         filter.Append(key.Key);
                         filter.Append(" eq '");
@@ -372,9 +377,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         Position = Array.IndexOf(keys, member.Member.Name),
                     });
 
-                    var overrideIsKey = _configuration.IgnoreKeyPropertyRemovables.ContainsKey(member.Member.Name);
-                    if (overrideIsKey)
-                        return false;
+                    //var overrideIsKey = _configuration.IgnoreKeyPropertyRemovables.ContainsKey(member.Member.Name);
+                    //if (overrideIsKey)
+                    //    return false;
                     return true;
                 }
 
