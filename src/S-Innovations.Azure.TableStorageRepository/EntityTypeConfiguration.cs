@@ -449,7 +449,9 @@ namespace SInnovations.Azure.TableStorageRepository
                 GetIndexKeyFunc = (objs) =>
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
-                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(obj, GetEncoder(propNames[idx]))));
+                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
+                        IgnoreKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
+                            TypeConvert(IgnoreKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
                     return idxKey;
                 },
                 CopyAllProperties = CopyAllProperties,
