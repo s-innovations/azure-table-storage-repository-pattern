@@ -94,7 +94,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             IEnumerable<EntityAdapter<TEntity>> tableEntities = _repository.ExecuteQuery<EntityAdapter<TEntity>>(result.TableQuery);
 
-            return GetProcessedResult(tableEntities, result);
+            return GetProcessedResultAsync(tableEntities, result).GetAwaiter().GetResult();
         }
         internal TranslationResult GetTranslationResult(Expression expression)
         {
@@ -136,7 +136,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <param name="expression"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public Task<object> ExecuteAsync(
+        public async Task<object> ExecuteAsync(
             Expression expression,
             CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -154,10 +154,12 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             Logger.LogDebug("Executing Async Expression : {0}, {1}, {2}",
                 result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns??Enumerable.Empty<string>()));
 
-        
-            return _repository
-                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery,cancellationToken)
-                .Then(p => GetProcessedResult(p, result), cancellationToken);
+
+            return await _repository
+                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)             
+                .Then(async p => await GetProcessedResultAsync(p, result).ConfigureAwait(false), cancellationToken)
+                .ConfigureAwait(false);
+ 
         }
 
         /// <summary>
@@ -166,19 +168,28 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <param name="tableEntities">Table entities.</param>
         /// <param name="translation">translation result.</param>
         /// <returns>Collection of entities.</returns>
-        private object GetProcessedResult(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
+        private async Task<IEnumerable<TEntity>> GetProcessedResultAsync(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
         {
+            if (!tableEntities.Any())
+                return  Enumerable.Empty<TEntity>();
+            var buffer = new BufferBlock<TEntity>();
             var block = new TransformBlock<EntityAdapter<TEntity>, TEntity>(async (adapter) =>
             {
-                return await KeepState(adapter);
+                var a= await KeepState(adapter).ConfigureAwait(false);
+
+                return a;
 
             });
-            foreach(var adapter in tableEntities) { block.Post(adapter); }
-            block.Complete();
-            block.Completion.Wait();
+            block.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
+            foreach (var adapter in tableEntities) { await block.SendAsync(adapter); }
 
-            IList<TEntity> result;
-            block.TryReceiveAll(out result);
+
+            block.Complete();
+            await block.Completion;
+
+
+            buffer.TryReceiveAll(out IList<TEntity> result);
+             
             //IEnumerable<TEntity> result = tableEntities.Select(q => KeepState(q));
 
             if (translation.PostProcessing == null)
@@ -188,7 +199,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             try
             {
-                return translation.PostProcessing.DynamicInvoke(result.AsQueryable());
+                return translation.PostProcessing.DynamicInvoke(result.AsQueryable()) as IEnumerable<TEntity>;
             }
             catch (TargetInvocationException e)
             {

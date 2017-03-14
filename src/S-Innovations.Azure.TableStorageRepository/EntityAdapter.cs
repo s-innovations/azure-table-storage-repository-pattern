@@ -32,7 +32,9 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 var adapter = Ref as IEntityAdapter;
                 var baseProps = base.WriteEntity(operationContext);
-                var props = baseProps.Concat(adapter.WrittenProperties.Where(k => !(k.Key == "PartitionKey" || k.Key == "RowKey")))
+                var props = baseProps
+                    .Concat(adapter.WrittenProperties.Where(k => !(k.Key == "PartitionKey" || k.Key == "RowKey")))
+                    .Concat(adapter.RemovedProperties ?? Enumerable.Empty<KeyValuePair<string,EntityProperty>>())
                     .ToDictionary(k => k.Key, v => v.Value);
                 return props;
             }
@@ -46,6 +48,7 @@ namespace SInnovations.Azure.TableStorageRepository
         object GetInnerObject();
         IDictionary<string, EntityProperty> Properties { get; }
         IDictionary<string, EntityProperty> WrittenProperties { get; }
+        IDictionary<string, EntityProperty> RemovedProperties { get; }
 
         Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity;
     }
@@ -200,7 +203,12 @@ namespace SInnovations.Azure.TableStorageRepository
             //Remove those parts that is used for partition/row keys. (redundant data)
             var keyprops = config.KeyMappings.Keys.SelectMany(k => k.Split(new string[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries));
             foreach (var key in keyprops.Where(n => !config.IgnoreKeyPropertyRemovables.ContainsKey(n)))
+            {
+                if (RemovedProperties == null)
+                    RemovedProperties = new Dictionary<string, EntityProperty>();
+                RemovedProperties.Add(key, WrittenProperties[key]);
                 WrittenProperties.Remove(key);
+            }
 
 
             EnsureSizeLimites(WrittenProperties);
@@ -315,6 +323,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public virtual IDictionary<string, EntityProperty> Properties { get; set; }
 
         public IDictionary<string, EntityProperty> WrittenProperties { get; set; }
+        public IDictionary<string, EntityProperty> RemovedProperties { get; set; }
 
     }
 }

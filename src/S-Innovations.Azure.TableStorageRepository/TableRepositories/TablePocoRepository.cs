@@ -252,6 +252,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             var result =  (await base.FindByIndexAsync(keys));
             if(result==null)
                 return default(TEntity);
+
+            await result.PostReadEntityAsync(this.Configuration).ConfigureAwait(false);
+      
             return result.InnerObject;
         }
         
@@ -261,6 +264,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             var result = (await base.FindByKeysAsync(partitionKey, rowKey));
             if (result == null)
                 return default(TEntity);
+
+            await result.PostReadEntityAsync(this.Configuration).ConfigureAwait(false);
+
             return SetCollections(result).InnerObject;
         }
         public async Task<IDictionary<string,EntityProperty>> FindPropertiesByKeysAsync(string partitionKey, string rowKey)
@@ -268,6 +274,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             var result = (await base.FindByKeysAsync(partitionKey, rowKey));
             if (result == null)
                 return new Dictionary<string, EntityProperty>();
+
             return result.Properties;
         }
 

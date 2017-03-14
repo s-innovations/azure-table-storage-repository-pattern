@@ -437,7 +437,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
             throw new Exception("not supported type");
         }
-        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, string TableName = null)
+        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, bool CopyAllProperties=false, string TableName = null)
         {
             string key = "";
 
@@ -451,7 +451,8 @@ namespace SInnovations.Azure.TableStorageRepository
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
                     var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(obj, GetEncoder(propNames[idx]))));
                     return idxKey;
-                }
+                },
+                CopyAllProperties = CopyAllProperties,
             });
 
             //Action<TEntityType, string> partitionAction = GetReverseActionFrom<IndexKeyType>(IndexKeyExpression);
@@ -695,7 +696,11 @@ namespace SInnovations.Azure.TableStorageRepository
                 var propertyName = memberEx.Member.Name;
                 key = propertyName;
                 var length = (lenghts == null || lenghts.Count == 0) ? (LengthPadding?)null : lenghts.Dequeue();
-                return (o) => ConvertToString(func(o), GetEncoder(propertyName), length);
+
+
+                return (o) => ConvertToString(IgnoreKeyPropertyRemovables.ContainsKey(propertyName) ? 
+                    TypeConvert(IgnoreKeyPropertyRemovables[propertyName], func(o)) : func(o) as object,
+                    GetEncoder(propertyName), length);
             }
             else if (expression.Body is NewExpression)
             {

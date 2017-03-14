@@ -121,13 +121,29 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 //TODO Optimize by executing all indexes at the same time and return the first found result.
                 foreach (var idxConfig in index)
                 {
-                    var opr = TableOperation.Retrieve<IndexEntity>(idxConfig.GetIndexKeyFunc(keys), "");
-                    var result = await table.ExecuteAsync(opr);
-                    if (result.Result != null)
+
+                    if (idxConfig.CopyAllProperties)
                     {
-                        var idxEntity = result.Result as IndexEntity;
-                        var entity = await Table.ExecuteAsync(TableOperation.Retrieve<TEntity>(idxEntity.RefPartitionKey, idxEntity.RefRowKey));
-                        return SetCollections((TEntity)entity.Result);
+                        var opr = TableOperation.Retrieve<TEntity>(idxConfig.GetIndexKeyFunc(keys), "");
+                        var entity = await table.ExecuteAsync(opr);
+                        if (entity.Result != null)
+                        {
+                            return (TEntity)entity.Result;
+                        }
+                    }
+                    else
+                    {
+
+                        var opr = TableOperation.Retrieve<IndexEntity>(idxConfig.GetIndexKeyFunc(keys), "");
+                        var result = await table.ExecuteAsync(opr);
+                        if (result.Result != null)
+                        {
+                            var idxEntity = result.Result as IndexEntity;
+
+
+                            var entity = await Table.ExecuteAsync(TableOperation.Retrieve<TEntity>(idxEntity.RefPartitionKey, idxEntity.RefRowKey));
+                            return SetCollections((TEntity)entity.Result);
+                        }
                     }
                 }
 
