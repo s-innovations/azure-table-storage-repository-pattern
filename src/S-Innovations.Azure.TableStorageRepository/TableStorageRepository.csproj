@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.4;net452</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <RootNamespace>SInnovations.Azure.TableStorageRepository</RootNamespace>
     <AssemblyName>S-Innovations.Azure.TableStorageRepository</AssemblyName>
     <Version>4.0.0-pre</Version>
@@ -13,10 +13,10 @@
 
   <ItemGroup>
     <PackageReference Include="System.Linq.Queryable" Version="4.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="1.1.0" />
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.0.0" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0" />
     <PackageReference Include="WindowsAzure.Storage">
-      <Version>8.1.0</Version>
+      <Version>8.7.0</Version>
     </PackageReference>
   </ItemGroup>
 
