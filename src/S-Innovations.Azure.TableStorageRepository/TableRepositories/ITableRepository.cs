@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
@@ -45,7 +46,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         Task<TEntity> FindByKeysAsync(string partitionKey, string rowKey);
         Task DeleteByKey(string partitionKey, string rowKey);
 
-        Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken);
+        Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken, CancellationToken cancellationToken = default(CancellationToken));
         CloudTable Table
         {
             get;

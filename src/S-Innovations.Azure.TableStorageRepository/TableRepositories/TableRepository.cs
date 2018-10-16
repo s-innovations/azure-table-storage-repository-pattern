@@ -13,6 +13,8 @@ using Microsoft.WindowsAzure.Storage;
 using System.Linq.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable;
 using Microsoft.Extensions.Logging;
+using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
+using System.Threading;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
@@ -542,8 +544,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             return opr;
         }
 
+      
 
-        public async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
+        public async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken continueTOken, CancellationToken cancellationToken = default(CancellationToken))
         {
             var q = new TableQuery<TEntity>
             {
@@ -551,10 +554,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 SelectColumns = query.SelectColumns,
                 TakeCount = query.TakeCount
             };
-            var result = await Table.ExecuteQuerySegmentedAsync<TEntity>(q, currentToken);
+            var result = await Table.ExecuteQuerySegmentedAsync(q, continueTOken);
+                
+
             return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Results, result.ContinuationToken);
 
         }
+
 
     }
 }

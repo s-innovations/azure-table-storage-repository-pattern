@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.Queryable;
+using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
 using System.Collections;
@@ -8,9 +9,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
@@ -367,10 +370,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
 
-        public new async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken)
+        public new async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var result = await base.ExecuteQuerySegmentedAsync(query, currentToken);
-            return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Item1.Select(e => e.InnerObject), result.Item2);
+            var result = await base.ExecuteQuerySegmentedAsync(query, currentToken)
+                 .Then(async p => new Tuple<IEnumerable<TEntity>, TableContinuationToken>( await GetProcessedResultAsync(p.Item1, new TranslationResult()).ConfigureAwait(false), p.Item2), cancellationToken);
+            return result;
+          //  return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Item1.Select(e => e), result.Item2);
 
              
         }
@@ -378,7 +383,67 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
 
+        private async Task<TEntity> KeepState(EntityAdapter<TEntity> entity)
+        {
+            //foreach (var entity in enumerable)
+            //  {
+            //TODO: key should properly be row+part key
+            //   _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
+            //        (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
 
+            //Set properties that infact are the part/row key
+            //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
+            //    }
+            //        return enumerable;
+            await entity.PostReadEntityAsync(Configuration);
+
+            return entity.InnerObject;
+        }
+
+        /// <summary>
+        ///     Executes post processing of retrieved entities.
+        /// </summary>
+        /// <param name="tableEntities">Table entities.</param>
+        /// <param name="translation">translation result.</param>
+        /// <returns>Collection of entities.</returns>
+        internal async Task<IEnumerable<TEntity>> GetProcessedResultAsync(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
+        {
+            if (!tableEntities.Any())
+                return Enumerable.Empty<TEntity>();
+            var buffer = new BufferBlock<TEntity>();
+            var block = new TransformBlock<EntityAdapter<TEntity>, TEntity>(async (adapter) =>
+            {
+                var a = await KeepState(adapter).ConfigureAwait(false);
+
+                return a;
+
+            });
+            block.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
+            foreach (var adapter in tableEntities) { await block.SendAsync(adapter); }
+
+
+            block.Complete();
+            await block.Completion;
+
+
+            buffer.TryReceiveAll(out IList<TEntity> result);
+
+            //IEnumerable<TEntity> result = tableEntities.Select(q => KeepState(q));
+
+            if (translation.PostProcessing == null)
+            {
+                return result;
+            }
+
+            try
+            {
+                return translation.PostProcessing.DynamicInvoke(result.AsQueryable()) as IEnumerable<TEntity>;
+            }
+            catch (TargetInvocationException e)
+            {
+                throw e.InnerException;
+            }
+        }
 
     }
 }

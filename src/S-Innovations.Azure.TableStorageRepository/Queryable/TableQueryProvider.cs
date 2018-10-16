@@ -82,7 +82,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             _entityConfiguration = entityConverter;
             _queryTranslator = new QueryTranslator(logfactory, entityConverter);
         }
-
+     
         /// <summary>
         ///     Executes expression query.
         /// </summary>
@@ -94,7 +94,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             IEnumerable<EntityAdapter<TEntity>> tableEntities = _repository.ExecuteQuery<EntityAdapter<TEntity>>(result.TableQuery);
 
-            return GetProcessedResultAsync(tableEntities, result).GetAwaiter().GetResult();
+            return _repository.GetProcessedResultAsync(tableEntities, result).GetAwaiter().GetResult();
         }
         internal TranslationResult GetTranslationResult(Expression expression)
         {
@@ -157,71 +157,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             return await _repository
                 .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)             
-                .Then(async p => await GetProcessedResultAsync(p, result).ConfigureAwait(false), cancellationToken)
+                .Then(async p => await _repository.GetProcessedResultAsync(p, result).ConfigureAwait(false), cancellationToken)
                 .ConfigureAwait(false);
  
         }
 
-        /// <summary>
-        ///     Executes post processing of retrieved entities.
-        /// </summary>
-        /// <param name="tableEntities">Table entities.</param>
-        /// <param name="translation">translation result.</param>
-        /// <returns>Collection of entities.</returns>
-        private async Task<IEnumerable<TEntity>> GetProcessedResultAsync(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
-        {
-            if (!tableEntities.Any())
-                return  Enumerable.Empty<TEntity>();
-            var buffer = new BufferBlock<TEntity>();
-            var block = new TransformBlock<EntityAdapter<TEntity>, TEntity>(async (adapter) =>
-            {
-                var a= await KeepState(adapter).ConfigureAwait(false);
+      
 
-                return a;
-
-            });
-            block.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-            foreach (var adapter in tableEntities) { await block.SendAsync(adapter); }
-
-
-            block.Complete();
-            await block.Completion;
-
-
-            buffer.TryReceiveAll(out IList<TEntity> result);
-             
-            //IEnumerable<TEntity> result = tableEntities.Select(q => KeepState(q));
-
-            if (translation.PostProcessing == null)
-            {
-                return result;
-            }
-
-            try
-            {
-                return translation.PostProcessing.DynamicInvoke(result.AsQueryable()) as IEnumerable<TEntity>;
-            }
-            catch (TargetInvocationException e)
-            {
-                throw e.InnerException;
-            }
-        }
-
-        private async Task<TEntity> KeepState(EntityAdapter<TEntity> entity)
-        {
-            //foreach (var entity in enumerable)
-            //  {
-            //TODO: key should properly be row+part key
-            //   _entityConfiguration.EntityStates.AddOrUpdate(entity.InnerObject.GetHashCode(),
-            //        (key) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag), (key,v) => new Tuple<DateTimeOffset, string>(entity.Timestamp, entity.ETag));
-
-            //Set properties that infact are the part/row key
-            //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
-            //    }
-            //        return enumerable;
-            await entity.PostReadEntityAsync(_entityConfiguration);
-
-            return entity.InnerObject;
-        }
+      
     }
 }
