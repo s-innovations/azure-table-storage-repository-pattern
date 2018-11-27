@@ -29,10 +29,11 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                     var result = ((TableQueryProvider<T>)provider).GetTranslationResult(query.Expression);
 
                     return result.TableQuery;
-                   
+
 
                 }
-            }catch(Exception ex)
+            }
+            catch (Exception ex)
             {
 
                 throw;
@@ -58,7 +59,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         private readonly TablePocoRepository<TEntity> _repository;
         private readonly EntityTypeConfiguration<TEntity> _entityConfiguration;
         private readonly QueryTranslator _queryTranslator;
-
+        private readonly List<string> _prefixes = new List<string>();
         /// <summary>
         ///     Constructor.
         /// </summary>
@@ -82,7 +83,12 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             _entityConfiguration = entityConverter;
             _queryTranslator = new QueryTranslator(logfactory, entityConverter);
         }
-     
+
+        public void AddPrefix(string prefix)
+        {
+            _prefixes.Add(prefix);
+        }
+
         /// <summary>
         ///     Executes expression query.
         /// </summary>
@@ -90,11 +96,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <returns>Result.</returns>
         public override object Execute(Expression expression)
         {
-            var result = GetTranslationResult(expression);
+            //var result = GetTranslationResult(expression);
 
-            IEnumerable<EntityAdapter<TEntity>> tableEntities = _repository.ExecuteQuery<EntityAdapter<TEntity>>(result.TableQuery);
+            //            IEnumerable<EntityAdapter<TEntity>> tableEntities = _repository.ExecuteQuery<EntityAdapter<TEntity>>(result.TableQuery);
 
-            return _repository.GetProcessedResultAsync(tableEntities, result).GetAwaiter().GetResult();
+            //          return _repository.GetProcessedResultAsync(tableEntities, result).GetAwaiter().GetResult();
+
+            return ExecuteAsync(expression).GetAwaiter().GetResult();
+
         }
         internal TranslationResult GetTranslationResult(Expression expression)
         {
@@ -107,7 +116,36 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             _queryTranslator.Translate(expression, result);
 
+            if (result.TableQuery.FilterString == "()")
+                result.TableQuery.FilterString = null;
+
             AddCollectionPropertiesFilters(result);
+
+            foreach (var prefix in _prefixes)
+            {
+                var length = prefix.Length - 1;
+                var nextChar = prefix[length] + 1;
+                var startWithEnd = prefix.Substring(0, length) + (char)nextChar;
+
+                var filter = TableQuery.CombineFilters(
+                   TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThanOrEqual, prefix),
+                   TableOperators.And,
+                   TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThan, startWithEnd));
+
+
+                if (string.IsNullOrEmpty(result.TableQuery.FilterString))
+                {
+                    result.TableQuery.FilterString = filter;
+                }
+                else
+                {
+                    result.TableQuery.FilterString = TableQuery.CombineFilters(
+                      filter,
+                       TableOperators.And,
+                        result.TableQuery.FilterString);
+                }
+            }
+
             return result;
         }
 
@@ -125,10 +163,10 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             }
         }
 
-        
 
-        
-        
+
+
+
 
         /// <summary>
         ///     Executes expression query asynchronously.
@@ -146,24 +184,25 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             }
             Logger.LogDebug("Translating Async Expression");
 
-            var result = new TranslationResult();
+            //var result = new TranslationResult();
 
-            _queryTranslator.Translate(expression, result);
-            
-            AddCollectionPropertiesFilters(result);
+            //_queryTranslator.Translate(expression, result);
+
+            //  AddCollectionPropertiesFilters(result);
+            var result = GetTranslationResult(expression);
             Logger.LogDebug("Executing Async Expression : {0}, {1}, {2}",
-                result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns??Enumerable.Empty<string>()));
+                result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns ?? Enumerable.Empty<string>()));
 
 
             return await _repository
-                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)             
+                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)
                 .Then(async p => await _repository.GetProcessedResultAsync(p, result).ConfigureAwait(false), cancellationToken)
                 .ConfigureAwait(false);
- 
+
         }
 
-      
 
-      
+
+
     }
 }

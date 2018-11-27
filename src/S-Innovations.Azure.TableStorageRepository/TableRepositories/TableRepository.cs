@@ -106,11 +106,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             var result = await Table.ExecuteAsync(op);
             return SetCollections((TEntity)result.Result);
         }
-        public Task DeleteByKey(string partitionKey, string rowKey)
+        public async Task DeleteByKey(string partitionKey, string rowKey)
         {
             if (Configuration.TraceOnAdd) { Logger.LogTrace($"Deleting entity by partitionkey:{partitionKey} and rowkey:{rowKey}"); }
 
-            return Table.ExecuteAsync(TableOperation.Delete(new TableEntity(partitionKey, rowKey) { ETag = "*" }));
+            var a= await Table.ExecuteAsync(TableOperation.Delete(new DynamicTableEntity(partitionKey, rowKey) { ETag = "*" }));
+            var b = a.Result as TableEntity;
+
         }
         public virtual async Task<TEntity> FindByIndexAsync(params object[] keys)
         {

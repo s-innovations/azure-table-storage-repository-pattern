@@ -22,6 +22,13 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             return result.TableQuery;
         }
 
+        public static IQueryable<T> WithPrefix<T>(this IQueryable<T> source, string prefix)
+        {
+            (source.Provider as TableQueryProvider<T>).AddPrefix(prefix);
+
+            return source;
+        }
+
         /// <summary>
         ///     Executes a query ToList method asynchronously.
         /// </summary>
@@ -43,6 +50,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             return tableQueryProvider.ExecuteAsync(source.Expression, cancellationToken)
                                      .Then(result => ((IEnumerable<T>)result).ToList(), cancellationToken);
         }
+
+       
 
         /// <summary>
         ///     Executes a query ToList method asynchronously.
