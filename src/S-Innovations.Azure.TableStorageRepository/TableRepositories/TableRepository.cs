@@ -236,261 +236,268 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return;
             }
 
-            var indexes = new ConcurrentBag<EntityStateWrapper<IndexEntity>>();
-
-            var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
+            try
             {
-                if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing ActionBlock of batch size {batch.Length}"); }
+                var indexes = new ConcurrentBag<EntityStateWrapper<IndexEntity>>();
 
-                var batchOpr = new TableBatchOperation();
-                foreach (var item in batch)
+                var actionblock = new ActionBlock<EntityStateWrapper<TEntity>[]>(async (batch) =>
                 {
+                    if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing ActionBlock of batch size {batch.Length}"); }
 
-                    switch (item.State)
+                    var batchOpr = new TableBatchOperation();
+                    foreach (var item in batch)
                     {
 
-                        case EntityState.Added:
+                        switch (item.State)
+                        {
 
-                            foreach (var index in Configuration.Indexes.Values)
-                            {
-                                try
+                            case EntityState.Added:
+
+                                foreach (var index in Configuration.Indexes.Values)
                                 {
-                                    var indexkeys = index.GetIndexKey(item.Entity);
-                                    if (indexkeys == null)
-                                        continue;
-
-                                    foreach (var indexkey in indexkeys)
+                                    try
                                     {
+                                        var indexkeys = index.GetIndexKey(item.Entity);
+                                        if (indexkeys == null)
+                                            continue;
 
-                                        indexes.Add(new EntityStateWrapper<IndexEntity>
+                                        foreach (var indexkey in indexkeys)
                                         {
-                                            State = EntityState.Added,
-                                            Entity =
-                                                new IndexEntity
-                                                {
-                                                    Config = index,
-                                                    PartitionKey = indexkey,
-                                                    RowKey = index.GetIndexSecondKey(item.Entity),
-                                                    RefRowKey = item.Entity.RowKey,
-                                                    RefPartitionKey = item.Entity.PartitionKey,
-                                                    Ref = item.Entity
-                                                }
-                                        });
+
+                                            indexes.Add(new EntityStateWrapper<IndexEntity>
+                                            {
+                                                State = EntityState.Added,
+                                                Entity =
+                                                    new IndexEntity
+                                                    {
+                                                        Config = index,
+                                                        PartitionKey = indexkey,
+                                                        RowKey = index.GetIndexSecondKey(item.Entity),
+                                                        RefRowKey = item.Entity.RowKey,
+                                                        RefPartitionKey = item.Entity.PartitionKey,
+                                                        Ref = item.Entity
+                                                    }
+                                            });
+
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
 
                                     }
                                 }
-                                catch (Exception ex)
+                                batchOpr.Add(GetInsertionOperation(item.Entity));
+                                break;
+                            case EntityState.Updated:
+                                foreach (var collection in Configuration.Collections)
                                 {
-
+                                    var rep = collection.PropertyInfo.GetValue(GetEntity(item.Entity)) as ITableRepository;
+                                    await rep.SaveChangesAsync();
                                 }
-                            }
-                            batchOpr.Add(GetInsertionOperation(item.Entity));
-                            break;
-                        case EntityState.Updated:
-                            foreach (var collection in Configuration.Collections)
-                            {
-                                var rep = collection.PropertyInfo.GetValue(GetEntity(item.Entity)) as ITableRepository;
-                                await rep.SaveChangesAsync();
-                            }
-                            batchOpr.Add(TableOperation.Merge(item.Entity));
-                            break;
-                        case EntityState.Deleted:
-                            batchOpr.Add(TableOperation.Delete(item.Entity));
-                            break;
-                        default:
-                            break;
+                                batchOpr.Add(TableOperation.Merge(item.Entity));
+                                break;
+                            case EntityState.Deleted:
+                                batchOpr.Add(TableOperation.Delete(item.Entity));
+                                break;
+                            default:
+                                break;
+                        }
+
                     }
 
-                }
-
-                using (new TraceTimer(Logger, string.Format("Executing operation {0} to {1}", batchOpr.Count, Table.Name)))
-                {
-                    try
+                    using (new TraceTimer(Logger, string.Format("Executing operation {0} to {1}", batchOpr.Count, Table.Name)))
                     {
+                        try
+                        {
                         //table.ExecuteBatch(batchOpr);
                         if (batchOpr.Count == 1)
-                            await Table.ExecuteAsync(batchOpr.First());
-                        else if (batchOpr.Count > 0)
-                            await Table.ExecuteBatchAsync(batchOpr);
-                    }
-                    catch (StorageException ex)
-                    {
-                        Logger.LogError(new EventId(),ex,"Storage Error execution on {tableName}, {ex}",Table.Name,ex);
-                        throw;
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(new EventId(), ex, "Error execution on {tableName}, {ex}", Table.Name, ex);
-                        throw;
-                    }
-                }
-
-            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
-
-            using (new TraceTimer(Logger,"Handling Entities"))
-            {
-                var buffer = new BufferBlock<EntityStateWrapper<TEntity>>();
-                var next = buffer;
-
-                var reversionOptions = Configuration.ReversionTracking;
-                if (reversionOptions.Enabled)
-                {
-                    //    var store = this as ITableRepository<TEntity>;
-
-                    next = new BufferBlock<EntityStateWrapper<TEntity>>();
-
-                    var trackReversionBlock = new TransformManyBlock<EntityStateWrapper<TEntity>, EntityStateWrapper<TEntity>>(async state =>
-                    {
-                        var entity = state.Entity;
-
-
-
-
-                        var oldQuery = reversionOptions.HeadWhereFilter.DynamicInvoke(this, (entity as IEntityAdapter)?.GetInnerObject() ?? entity) as ITableQuery;
-
-                        var old = await this.Table.ExecuteQueryAsync(new TableQuery<TEntity> { FilterString = oldQuery.FilterString, TakeCount = 1 });
-
-                        if (old.Any())
+                                await Table.ExecuteAsync(batchOpr.First());
+                            else if (batchOpr.Count > 0)
+                                await Table.ExecuteBatchAsync(batchOpr);
+                        }
+                        catch (StorageException ex)
                         {
+                            Logger.LogError(new EventId(), ex, "Storage Error execution on {tableName}, {ex}", Table.Name, ex);
+                            throw;
 
                         }
-
-                        if (entity is IEntityAdapter)
+                        catch (Exception ex)
                         {
-                            var adapter = entity as IEntityAdapter;
-                            entity = await adapter.MakeReversionCloneAsync(old.FirstOrDefault());
-
-
+                            Logger.LogError(new EventId(), ex, "Error execution on {tableName}, {ex}", Table.Name, ex);
+                            throw;
                         }
+                    }
 
+                }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
 
-                        if (entity != null)
-                        {
-                            return new[] { state, new EntityStateWrapper<TEntity> { State = state.State, Entity = entity } };
-                        }
-                        return new[] { state };
-
-                    }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
-
-                    buffer.LinkTo(trackReversionBlock, new DataflowLinkOptions { PropagateCompletion = true });
-                    trackReversionBlock.LinkTo(next, new DataflowLinkOptions { PropagateCompletion = true });
-                    // trackReversionBlock.Completion.ContinueWith(t =>
-                    //  {
-                    //       if (t.IsFaulted) ((IDataflowBlock)next).Fault(t.Exception);
-                    //       else next.Complete();
-                    //   });
-
-
-
-
-                }
-
-                var grouper = CreateGroupingBlock();
-                next.LinkTo(grouper, new DataflowLinkOptions { PropagateCompletion = true });
-                grouper.LinkTo(actionblock, new DataflowLinkOptions { PropagateCompletion = true });
-
-
-                foreach (var entityState in _cache)
+                using (new TraceTimer(Logger, "Handling Entities"))
                 {
-                    var entity = SetKeys(entityState.Entity, entityState.KeysLocked);
+                    var buffer = new BufferBlock<EntityStateWrapper<TEntity>>();
+                    var next = buffer;
 
-                    buffer.Post(entityState);
-                }
-
-                buffer.Complete();
-                await actionblock.Completion;
-                //  var a = new System.Threading.Tasks.Dataflow.BatchBlock(100,new GroupingDataflowBlockOptions {})
-
-
-
-                //var batches = _cache.GroupBy(b => SetKeys(b.Entity, b.KeysLocked).PartitionKey);
-                //foreach (var group in batches)
-                //    foreach (var batch in group
-                //          .Select((x, i) => new { Group = x, Index = i })
-                //          .GroupBy(x => x.Index / 100)
-                //          .Select(x => x.Select(v => v.Group).ToArray())
-                //          .Select(t => t.ToArray()))
-                //    {
-                //        Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
-                //        await actionblock.SendAsync(batch);
-                //    }
-
-                //  actionblock.Complete();
-                //  await actionblock.Completion;
-            }
-
-            var block = new ActionBlock<Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>>(async (tuple) =>
-            {
-                var batch = tuple.Item2;
-                var table = tuple.Item1;
-                if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing Index ActionBlock of batch size {batch.Length}"); }
-
-                var batchOpr = new TableBatchOperation();
-                foreach (var item in batch)
-                {
-
-                    switch (item.State)
+                    var reversionOptions = Configuration.ReversionTracking;
+                    if (reversionOptions.Enabled)
                     {
-                        case EntityState.Added:
-                            batchOpr.Add(GetInsertionOperation(item.Entity));
+                        //    var store = this as ITableRepository<TEntity>;
+
+                        next = new BufferBlock<EntityStateWrapper<TEntity>>();
+
+                        var trackReversionBlock = new TransformManyBlock<EntityStateWrapper<TEntity>, EntityStateWrapper<TEntity>>(async state =>
+                        {
+                            var entity = state.Entity;
+
+
+
+
+                            var oldQuery = reversionOptions.HeadWhereFilter.DynamicInvoke(this, (entity as IEntityAdapter)?.GetInnerObject() ?? entity) as ITableQuery;
+
+                            var old = await this.Table.ExecuteQueryAsync(new TableQuery<TEntity> { FilterString = oldQuery.FilterString, TakeCount = 1 });
+
+                            if (old.Any())
+                            {
+
+                            }
+
+                            if (entity is IEntityAdapter)
+                            {
+                                var adapter = entity as IEntityAdapter;
+                                entity = await adapter.MakeReversionCloneAsync(old.FirstOrDefault());
+
+
+                            }
+
+
+                            if (entity != null)
+                            {
+                                return new[] { state, new EntityStateWrapper<TEntity> { State = state.State, Entity = entity } };
+                            }
+                            return new[] { state };
+
+                        }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
+
+                        buffer.LinkTo(trackReversionBlock, new DataflowLinkOptions { PropagateCompletion = true });
+                        trackReversionBlock.LinkTo(next, new DataflowLinkOptions { PropagateCompletion = true });
+                        // trackReversionBlock.Completion.ContinueWith(t =>
+                        //  {
+                        //       if (t.IsFaulted) ((IDataflowBlock)next).Fault(t.Exception);
+                        //       else next.Complete();
+                        //   });
+
+
+
+
+                    }
+
+                    var grouper = CreateGroupingBlock();
+                    next.LinkTo(grouper, new DataflowLinkOptions { PropagateCompletion = true });
+                    grouper.LinkTo(actionblock, new DataflowLinkOptions { PropagateCompletion = true });
+
+
+                    foreach (var entityState in _cache)
+                    {
+                        var entity = SetKeys(entityState.Entity, entityState.KeysLocked);
+
+                        buffer.Post(entityState);
+                    }
+
+                    buffer.Complete();
+                    await actionblock.Completion;
+                    //  var a = new System.Threading.Tasks.Dataflow.BatchBlock(100,new GroupingDataflowBlockOptions {})
+
+
+
+                    //var batches = _cache.GroupBy(b => SetKeys(b.Entity, b.KeysLocked).PartitionKey);
+                    //foreach (var group in batches)
+                    //    foreach (var batch in group
+                    //          .Select((x, i) => new { Group = x, Index = i })
+                    //          .GroupBy(x => x.Index / 100)
+                    //          .Select(x => x.Select(v => v.Group).ToArray())
+                    //          .Select(t => t.ToArray()))
+                    //    {
+                    //        Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
+                    //        await actionblock.SendAsync(batch);
+                    //    }
+
+                    //  actionblock.Complete();
+                    //  await actionblock.Completion;
+                }
+
+                var block = new ActionBlock<Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>>(async (tuple) =>
+                {
+                    var batch = tuple.Item2;
+                    var table = tuple.Item1;
+                    if (Configuration.TraceOnAdd) { Logger.LogTrace($"Executing Index ActionBlock of batch size {batch.Length}"); }
+
+                    var batchOpr = new TableBatchOperation();
+                    foreach (var item in batch)
+                    {
+
+                        switch (item.State)
+                        {
+                            case EntityState.Added:
+                                batchOpr.Add(GetInsertionOperation(item.Entity));
                             //await item.Item1.ExecuteAsync(GetInsertionOperation(item.Item2.Entity));
                             break;
-                        case EntityState.Updated:
-                            batchOpr.Add(TableOperation.Merge(item.Entity));
+                            case EntityState.Updated:
+                                batchOpr.Add(TableOperation.Merge(item.Entity));
                             //await item.Item1.ExecuteAsync(TableOperation.Merge(item.Item2.Entity));
                             break;
-                        case EntityState.Deleted:
-                            batchOpr.Add(TableOperation.Delete(item.Entity));
+                            case EntityState.Deleted:
+                                batchOpr.Add(TableOperation.Delete(item.Entity));
                             //await item.Item1.ExecuteAsync(TableOperation.Delete(item.Item2.Entity));
                             break;
-                        default:
-                            break;
+                            default:
+                                break;
+                        }
                     }
-                }
 
-                using (new TraceTimer(Logger,string.Format("Executing operation {0} to {1}", batchOpr.Count, table.Name)))
-                {
-                    try
+                    using (new TraceTimer(Logger, string.Format("Executing operation {0} to {1}", batchOpr.Count, table.Name)))
                     {
+                        try
+                        {
                         //table.ExecuteBatch(batchOpr);
                         if (batchOpr.Count == 1)
-                            await table.ExecuteAsync(batchOpr.First());
-                        else
-                            await table.ExecuteBatchAsync(batchOpr);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(new EventId(),ex,"Error execution {ex}",ex);
-                        throw;
-                    }
-                }
-
-            }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
-
-            using (new TraceTimer(Logger,"Handling Indexes"))
-            {
-                foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName?.Invoke(this.Context) ?? Configuration.TableName(this.Context) + idx.Entity.Config.TableNamePostFix))
-                {
-                    var indexTable = Context.GetTable(indexkey.Key);
-                    var batches = indexkey.GroupBy(k => k.Entity.PartitionKey);
-                    foreach (var group in batches)
-                        foreach (var batch in group
-                          .Select((x, i) => new { Group = x, Index = i })
-                          .GroupBy(x => x.Index / 100)
-                          .Select(x => x.Select(v => v.Group).ToArray())
-                          .Select(t => t.ToArray()))
-                        {
-                            Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
-                            await block.SendAsync(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>(indexTable, batch));
+                                await table.ExecuteAsync(batchOpr.First());
+                            else
+                                await table.ExecuteBatchAsync(batchOpr);
                         }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError(new EventId(), ex, "Error execution {ex}", ex);
+                            throw;
+                        }
+                    }
+
+                }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Context.MaxDegreeOfParallelism });
+
+                using (new TraceTimer(Logger, "Handling Indexes"))
+                {
+                    foreach (var indexkey in indexes.GroupBy(idx => idx.Entity.Config.TableName?.Invoke(this.Context) ?? Configuration.TableName(this.Context) + idx.Entity.Config.TableNamePostFix))
+                    {
+                        var indexTable = Context.GetTable(indexkey.Key);
+                        var batches = indexkey.GroupBy(k => k.Entity.PartitionKey);
+                        foreach (var group in batches)
+                            foreach (var batch in group
+                              .Select((x, i) => new { Group = x, Index = i })
+                              .GroupBy(x => x.Index / 100)
+                              .Select(x => x.Select(v => v.Group).ToArray())
+                              .Select(t => t.ToArray()))
+                            {
+                                Logger.LogTrace($"Posting Batch of lenght: {batch.Length}");
+                                await block.SendAsync(new Tuple<CloudTable, EntityStateWrapper<IndexEntity>[]>(indexTable, batch));
+                            }
 
 
+                    }
+                    block.Complete();
+                    await block.Completion;
                 }
-                block.Complete();
-                await block.Completion;
             }
-            _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
+            finally
+            {
+                _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
+            }
+           
 
         }
 
