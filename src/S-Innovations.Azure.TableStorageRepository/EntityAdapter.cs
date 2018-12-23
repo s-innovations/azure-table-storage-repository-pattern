@@ -245,7 +245,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public async Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity
         {
-            var rowKey = RowKey;
+         
+             var rowKey = RowKey;
                RowKey = "";
             var copy = new EntityAdapter<TEntity>(context, config, InnerObject)
             {

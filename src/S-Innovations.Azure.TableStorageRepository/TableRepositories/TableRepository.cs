@@ -205,7 +205,9 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     buffer.Post(dictionary[key].ToArray());
                     dictionary.Remove(key);
                 }
-                buffer.Complete();
+
+                if (task.IsFaulted) ((IDataflowBlock)buffer).Fault(task.Exception);
+                else buffer.Complete(); 
             });
             var prop = DataflowBlock.Encapsulate(actionBlock, buffer);
             //prop.Completion.ContinueWith(task =>
@@ -361,7 +363,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                             if (entity is IEntityAdapter)
                             {
                                 var adapter = entity as IEntityAdapter;
-                                entity = await adapter.MakeReversionCloneAsync(old.FirstOrDefault());
+                                entity = await adapter.MakeReversionCloneAsync(await PostReadEntityAsync(  old.FirstOrDefault()));
 
 
                             }
@@ -377,15 +379,6 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
                         buffer.LinkTo(trackReversionBlock, new DataflowLinkOptions { PropagateCompletion = true });
                         trackReversionBlock.LinkTo(next, new DataflowLinkOptions { PropagateCompletion = true });
-                        // trackReversionBlock.Completion.ContinueWith(t =>
-                        //  {
-                        //       if (t.IsFaulted) ((IDataflowBlock)next).Fault(t.Exception);
-                        //       else next.Complete();
-                        //   });
-
-
-
-
                     }
 
                     var grouper = CreateGroupingBlock();
@@ -500,6 +493,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            
 
         }
+
+        public abstract Task<TEntity> PostReadEntityAsync(TEntity entity);
 
         private object GetEntity(object entity)
         {

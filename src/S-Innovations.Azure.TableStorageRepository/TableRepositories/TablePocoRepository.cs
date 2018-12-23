@@ -256,7 +256,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if(result==null)
                 return default(TEntity);
 
-            await result.PostReadEntityAsync(this.Configuration).ConfigureAwait(false);
+            await PostReadEntityAsync(result).ConfigureAwait(false);
       
             return result.InnerObject;
         }
@@ -268,7 +268,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if (result == null)
                 return default(TEntity);
 
-            await result.PostReadEntityAsync(this.Configuration).ConfigureAwait(false);
+
+            await PostReadEntityAsync(result).ConfigureAwait(false);
 
             return SetCollections(result).InnerObject;
         }
@@ -395,7 +396,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             //   _entityConfiguration.ReverseKeyMapping<TEntity>(entity);
             //    }
             //        return enumerable;
-            await entity.PostReadEntityAsync(Configuration);
+         //   await entity.PostReadEntityAsync(Configuration);
+            await PostReadEntityAsync(entity);
 
             return entity.InnerObject;
         }
@@ -445,5 +447,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             }
         }
 
+        public override async Task<EntityAdapter<TEntity>> PostReadEntityAsync(EntityAdapter<TEntity> entity)
+        {
+            if (entity != null)
+            {
+                await entity.PostReadEntityAsync(Configuration);
+            }
+            return entity;
+        }
     }
 }
