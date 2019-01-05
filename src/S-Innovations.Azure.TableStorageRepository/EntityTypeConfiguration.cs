@@ -42,6 +42,13 @@ namespace SInnovations.Azure.TableStorageRepository
 
         public override string[] GetIndexKey(object entity)
         {
+           if (entity is IEntityAdapter adapter && adapter.IsReversionClone)
+           {
+                //Dont index reversion clones
+                return null;
+           }
+
+
             TEntity data = entity is IEntityAdapter ? (TEntity)((IEntityAdapter)entity).GetInnerObject() : (TEntity)entity;
 
             if(PartitionSplitKeyProvider != null)

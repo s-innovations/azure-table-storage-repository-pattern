@@ -249,6 +249,8 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     var batchOpr = new TableBatchOperation();
                     foreach (var item in batch)
                     {
+                       
+
 
                         switch (item.State)
                         {

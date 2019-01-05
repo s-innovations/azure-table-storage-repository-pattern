@@ -51,6 +51,8 @@ namespace SInnovations.Azure.TableStorageRepository
         IDictionary<string, EntityProperty> RemovedProperties { get; }
 
         Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity;
+
+        bool IsReversionClone { get; }
     }
     public interface IEntityAdapter<T> : IEntityAdapter
     {
@@ -242,7 +244,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 properties[task.Key] = task.Value;
             }
         }
-
+        public bool IsReversionClone { get; set; }
         public async Task<TTableEntity> MakeReversionCloneAsync<TTableEntity>(TTableEntity old) where TTableEntity : class, ITableEntity
         {
          
@@ -253,7 +255,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 ReversionBase = old as EntityAdapter<TEntity>,
                 PartitionKey = PartitionKey.Replace("HEAD", "REV"),
                 RowKey = rowKey,
-               
+                IsReversionClone = true
             };
 
             if (copy.ReversionBase != null)
