@@ -444,11 +444,11 @@ namespace SInnovations.Azure.TableStorageRepository
 
             throw new Exception("not supported type");
         }
-        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, bool CopyAllProperties=false, string TableName = null)
+        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, bool CopyAllProperties=false, string TableName = null, string partitionPrefix = null)
         {
             string key = "";
 
-            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key);
+            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key,null,partitionPrefix);
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
                 PartitionKeyProvider = entityToKeyProperty,
@@ -459,7 +459,9 @@ namespace SInnovations.Azure.TableStorageRepository
                     var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
                         IgnoreKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
                             TypeConvert(IgnoreKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
-                    return idxKey;
+                    if(string.IsNullOrEmpty(partitionPrefix))
+                        return idxKey;
+                    return $"{partitionPrefix}{TableStorageContext.KeySeparator}{idxKey}";
                 },
                 CopyAllProperties = CopyAllProperties,
             });
@@ -696,7 +698,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, Queue<LengthPadding?> lenghts = null)
+        public Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, Queue<LengthPadding?> lenghts = null, string prefix = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -735,11 +737,14 @@ namespace SInnovations.Azure.TableStorageRepository
                         GetEncoder(properties[i].Name), lenghtsList[i])
                     ).ToArray();
 
-                   
+
                     //If any nulls, then the key becomes a enmpty string.
                     //   if (objs.Any(p => p == null))
                     //       return "";
-
+                    if (!string.IsNullOrEmpty(prefix))
+                    {
+                        return $"{prefix}{TableStorageContext.KeySeparator}{string.Join(TableStorageContext.KeySeparator, objs.Select(t => t == null ? "" : t))}";
+                    }
                     return string.Join(TableStorageContext.KeySeparator, objs.Select(t => t == null ? "" : t));
 
                 };
