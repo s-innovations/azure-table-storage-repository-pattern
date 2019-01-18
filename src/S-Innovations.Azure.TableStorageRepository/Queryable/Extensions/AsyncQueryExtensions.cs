@@ -28,6 +28,15 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             return source;
         }
+        public static IQueryable<T> WithODataFilter<T>(this IQueryable<T> source, string filter)
+        {
+            if (string.IsNullOrEmpty(filter))
+                return source;
+
+            (source.Provider as TableQueryProvider<T>).WithODataFilter(filter);
+
+            return source;
+        }
 
         /// <summary>
         ///     Executes a query ToList method asynchronously.

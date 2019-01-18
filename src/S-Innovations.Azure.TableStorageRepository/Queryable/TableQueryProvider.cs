@@ -60,6 +60,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         private readonly EntityTypeConfiguration<TEntity> _entityConfiguration;
         private readonly QueryTranslator _queryTranslator;
         private readonly List<string> _prefixes = new List<string>();
+        private readonly List<string> _filters = new List<string>();
         /// <summary>
         ///     Constructor.
         /// </summary>
@@ -87,6 +88,10 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         public void AddPrefix(string prefix)
         {
             _prefixes.Add(prefix);
+        }
+        public void WithODataFilter(string filter)
+        {
+            _filters.Add(filter);
         }
 
         /// <summary>
@@ -121,6 +126,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
             AddCollectionPropertiesFilters(result);
 
+            var prefixFilter = "";
+
             foreach (var prefix in _prefixes)
             {
                 var length = prefix.Length - 1;
@@ -132,7 +139,40 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                    TableOperators.And,
                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThan, startWithEnd));
 
+               
 
+                if (string.IsNullOrEmpty(prefixFilter))
+                {
+                    prefixFilter = filter;
+                }
+                else
+                {
+                    prefixFilter = TableQuery.CombineFilters(
+                      filter,
+                       TableOperators.Or,
+                        prefixFilter);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(prefixFilter))
+            {
+
+                if (string.IsNullOrEmpty(result.TableQuery.FilterString))
+                {
+                    result.TableQuery.FilterString = prefixFilter;
+                }
+                else
+                {
+                    result.TableQuery.FilterString = TableQuery.CombineFilters(
+                      prefixFilter,
+                       TableOperators.And,
+                        result.TableQuery.FilterString);
+                }
+            }
+
+
+            foreach (var filter in _filters)
+            {
                 if (string.IsNullOrEmpty(result.TableQuery.FilterString))
                 {
                     result.TableQuery.FilterString = filter;
@@ -140,9 +180,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                 else
                 {
                     result.TableQuery.FilterString = TableQuery.CombineFilters(
-                      filter,
-                       TableOperators.And,
-                        result.TableQuery.FilterString);
+                        result.TableQuery.FilterString,
+                       TableOperators.And,filter)                      ;
                 }
             }
 
