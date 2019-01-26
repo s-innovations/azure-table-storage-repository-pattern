@@ -1,5 +1,6 @@
 ﻿using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -9,6 +10,54 @@ using System.Threading.Tasks;
 
 namespace SInnovations.Azure.TableStorageRepository.Queryable
 {
+    public interface IWrappingQueryable<T>
+    {
+        IQueryable<T> Parent { get; }
+    }
+    public class PrefixWrappingQueryableWrapper<TEntity> : IQueryable<TEntity>, IWrappingQueryable<TEntity>
+    {
+        public IQueryable<TEntity> Parent { get; }
+        public string Prefix { get; }
+
+        public PrefixWrappingQueryableWrapper(IQueryable<TEntity> parent, string prefix)
+        {
+            this.Parent = parent;
+            this.Prefix = prefix;
+            this.Provider = (parent as TableQueryProvider<TEntity>).Clone(this);
+        }
+        public Type ElementType => this.Parent.ElementType;
+
+        public Expression Expression => this.Parent.Expression;
+
+        public IQueryProvider Provider { get; }
+
+        public IEnumerator<TEntity> GetEnumerator() => this.Parent.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => this.Parent.GetEnumerator();
+
+    }
+    public class FilterWrappingQueryableWrapper<TEntity> : IQueryable<TEntity>, IWrappingQueryable<TEntity>
+    {
+        public IQueryable<TEntity> Parent { get; }
+        public string Filter { get; }
+
+        public FilterWrappingQueryableWrapper(IQueryable<TEntity> parent, string filter)
+        {
+            this.Parent = parent;
+            this.Filter = filter;
+            this.Provider = (parent as TableQueryProvider<TEntity>).Clone(this);
+        }
+        public Type ElementType => this.Parent.ElementType;
+
+        public Expression Expression => this.Parent.Expression;
+
+        public IQueryProvider Provider { get; }
+
+        public IEnumerator<TEntity> GetEnumerator() => this.Parent.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => this.Parent.GetEnumerator();
+
+    }
     /// <summary>
     ///     LINQ extensions for a asynchronous query execution.
     /// </summary>
@@ -24,18 +73,22 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
         public static IQueryable<T> WithPrefix<T>(this IQueryable<T> source, string prefix)
         {
-            (source.Provider as TableQueryProvider<T>).AddPrefix(prefix);
+            return new PrefixWrappingQueryableWrapper<T>(source,prefix);
 
-            return source;
+          //  (source.Provider as TableQueryProvider<T>).AddPrefix(prefix);
+
+          //  return source;
         }
         public static IQueryable<T> WithODataFilter<T>(this IQueryable<T> source, string filter)
         {
             if (string.IsNullOrEmpty(filter))
                 return source;
 
-            (source.Provider as TableQueryProvider<T>).WithODataFilter(filter);
+            return new FilterWrappingQueryableWrapper<T>(source, filter);
 
-            return source;
+            //(source.Provider as TableQueryProvider<T>).WithODataFilter(filter);
+
+            //return source;
         }
 
         /// <summary>

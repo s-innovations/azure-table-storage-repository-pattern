@@ -50,25 +50,31 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
     /// <typeparam name="TEntity">Entity type.</typeparam>
     internal class TableQueryProvider<TEntity> : QueryProviderBase, IAsyncQueryProvider
     {
+
+       public TableQueryProvider<TEntity> Clone(IQueryable<TEntity> source)
+        {
+            return new TableQueryProvider<TEntity>(this._loggerFactory, source, this._entityConfiguration);
+        }
+
         /// <summary>
         /// The logger
         /// </summary>
         private readonly ILogger Logger;
+        private readonly ILoggerFactory _loggerFactory;
 
-
-        private readonly TablePocoRepository<TEntity> _repository;
+        private readonly IQueryable<TEntity> _source;
         private readonly EntityTypeConfiguration<TEntity> _entityConfiguration;
         private readonly QueryTranslator _queryTranslator;
-        private readonly List<string> _prefixes = new List<string>();
-        private readonly List<string> _filters = new List<string>();
+        //private readonly List<string> _prefixes = new List<string>();
+        //private readonly List<string> _filters = new List<string>();
         /// <summary>
         ///     Constructor.
         /// </summary>
-        /// <param name="cloudTable">Cloud table.</param>
+        /// <param name="source">Cloud table.</param>
         /// <param name="entityConverter"></param>
-        internal TableQueryProvider(ILoggerFactory logfactory, TablePocoRepository<TEntity> cloudTable, EntityTypeConfiguration<TEntity> entityConverter)
+        internal TableQueryProvider(ILoggerFactory logfactory, IQueryable<TEntity> source, EntityTypeConfiguration<TEntity> entityConverter)
         {
-            if (cloudTable == null)
+            if (source == null)
             {
                 throw new ArgumentNullException("cloudTable");
             }
@@ -79,20 +85,16 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             }
 
             Logger = logfactory.CreateLogger<TableQueryProvider<TEntity>>();
-
-            _repository = cloudTable;
+            _loggerFactory = logfactory;
+            _source = source;
             _entityConfiguration = entityConverter;
             _queryTranslator = new QueryTranslator(logfactory, entityConverter);
         }
 
-        public void AddPrefix(string prefix)
-        {
-            _prefixes.Add(prefix);
-        }
-        public void WithODataFilter(string filter)
-        {
-            _filters.Add(filter);
-        }
+
+      
+
+       
 
         /// <summary>
         ///     Executes expression query.
@@ -127,6 +129,30 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             AddCollectionPropertiesFilters(result);
 
             var prefixFilter = "";
+
+
+            var _prefixes = new List<string>();
+            var _filters = new List<string>();
+            var source = _source;
+            while (source is IWrappingQueryable<TEntity> wrapper)
+            {
+                if(wrapper is PrefixWrappingQueryableWrapper<TEntity> prefix)
+                {
+                    _prefixes.Add(prefix.Prefix);
+                }
+
+                if (wrapper is FilterWrappingQueryableWrapper<TEntity> filter)
+                {
+                    _filters.Add(filter.Filter);
+                }
+
+
+                source = wrapper.Parent;
+
+            }
+            _prefixes.Reverse();
+            _filters.Reverse();
+
 
             foreach (var prefix in _prefixes)
             {
@@ -231,6 +257,15 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             var result = GetTranslationResult(expression);
             Logger.LogDebug("Executing Async Expression : {0}, {1}, {2}",
                 result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns ?? Enumerable.Empty<string>()));
+
+          
+            var source = _source;
+            while(source is IWrappingQueryable<TEntity> wrapper)
+            {
+                source = wrapper.Parent;
+            }
+
+            var _repository = source as TablePocoRepository<TEntity>;
 
 
             return await _repository
