@@ -18,6 +18,30 @@ using System.Threading.Tasks.Dataflow;
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
 
+    public class ProjectedQuery<TProjected,TEntity> : IQueryable<TProjected>
+    {
+
+        public ProjectedQuery(TablePocoRepository<TEntity>  repository, ILoggerFactory logFactory, ITableStorageContext context, EntityTypeConfiguration<TEntity> configuration)
+        {
+           Provider = new TableQueryProvider<TEntity, TProjected>(logFactory, repository, configuration);
+           Expression = Expression.Constant(this); 
+        }
+        public Type ElementType => typeof(TProjected);
+
+        public Expression Expression { get;  }
+
+        public IQueryProvider Provider { get; }
+
+        public IEnumerator<TProjected> GetEnumerator()
+        {
+            return ((IEnumerable<TProjected>)Provider.Execute(Expression)).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return ((IEnumerable)Provider.Execute(Expression)).GetEnumerator();
+        }
+    }
 
 
     public class TablePocoRepository<TEntity> :
@@ -25,7 +49,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
            ITableRepository<TEntity>
     {
 
-        private readonly ILogger Logger;
+
+        public IQueryable<T> Project<T>()
+        {
+            return new ProjectedQuery<T, TEntity>(this,this.loggerFactory,this.Context,this.configuration.Value as EntityTypeConfiguration<TEntity>);
+        }
+
+    private readonly ILogger Logger;
         private readonly Expression _expression;
         public new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
@@ -256,7 +286,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if(result==null)
                 return default(TEntity);
 
-            await PostReadEntityAsync(result).ConfigureAwait(false);
+            await PostReadEntityAsync(result,null).ConfigureAwait(false);
       
             return result.InnerObject;
         }
@@ -269,7 +299,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 return default(TEntity);
 
 
-            await PostReadEntityAsync(result).ConfigureAwait(false);
+            await PostReadEntityAsync(result,null).ConfigureAwait(false);
 
             return SetCollections(result).InnerObject;
         }
@@ -374,7 +404,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         public new async Task<Tuple<IEnumerable<TEntity>, TableContinuationToken>> ExecuteQuerySegmentedAsync(ITableQuery query, TableContinuationToken currentToken, CancellationToken cancellationToken = default(CancellationToken))
         {
             var result = await base.ExecuteQuerySegmentedAsync(query, currentToken)
-                 .Then(async p => new Tuple<IEnumerable<TEntity>, TableContinuationToken>( await GetProcessedResultAsync(p.Item1, new TranslationResult()).ConfigureAwait(false), p.Item2), cancellationToken);
+                 .Then(async p => new Tuple<IEnumerable<TEntity>, TableContinuationToken>( await GetProcessedResultAsync(p.Item1, new TranslationResult(),null).ConfigureAwait(false), p.Item2), cancellationToken);
             return result;
           //  return new Tuple<IEnumerable<TEntity>, TableContinuationToken>(result.Item1.Select(e => e), result.Item2);
 
@@ -384,7 +414,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
 
-        private async Task<TEntity> KeepState(EntityAdapter<TEntity> entity)
+        private async Task<TEntity> KeepState(EntityAdapter<TEntity> entity, IOverrides overrides)
         {
             //foreach (var entity in enumerable)
             //  {
@@ -397,7 +427,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             //    }
             //        return enumerable;
          //   await entity.PostReadEntityAsync(Configuration);
-            await PostReadEntityAsync(entity);
+            await PostReadEntityAsync(entity,overrides);
 
             return entity.InnerObject;
         }
@@ -408,14 +438,14 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// <param name="tableEntities">Table entities.</param>
         /// <param name="translation">translation result.</param>
         /// <returns>Collection of entities.</returns>
-        internal async Task<IEnumerable<TEntity>> GetProcessedResultAsync(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation)
+        internal async Task<IEnumerable<TEntity>> GetProcessedResultAsync(IEnumerable<EntityAdapter<TEntity>> tableEntities, TranslationResult translation, IOverrides overrides)
         {
             if (!tableEntities.Any())
                 return Enumerable.Empty<TEntity>();
             var buffer = new BufferBlock<TEntity>();
             var block = new TransformBlock<EntityAdapter<TEntity>, TEntity>(async (adapter) =>
             {
-                var a = await KeepState(adapter).ConfigureAwait(false);
+                var a = await KeepState(adapter,overrides).ConfigureAwait(false);
 
                 return a;
 
@@ -447,11 +477,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             }
         }
 
-        public override async Task<EntityAdapter<TEntity>> PostReadEntityAsync(EntityAdapter<TEntity> entity)
+        public override async Task<EntityAdapter<TEntity>> PostReadEntityAsync(EntityAdapter<TEntity> entity, IOverrides overrides)
         {
             if (entity != null)
             {
-                await entity.PostReadEntityAsync(Configuration);
+                await entity.PostReadEntityAsync(Configuration,overrides);
             }
             return entity;
         }

@@ -37,6 +37,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
     public abstract class TableRepository<TEntity> where TEntity : class, ITableEntity, new()
     {
+        protected readonly ILoggerFactory loggerFactory;
         private readonly ILogger Logger;
         private ConcurrentBag<EntityStateWrapper<TEntity>> _cache = new ConcurrentBag<EntityStateWrapper<TEntity>>();
 
@@ -56,6 +57,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             this.Context = context;
             this.configuration = configuration;
             this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.Value.TableName(context)));
+            this.loggerFactory = logFactory;
         }
 
 
@@ -365,7 +367,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                             if (entity is IEntityAdapter)
                             {
                                 var adapter = entity as IEntityAdapter;
-                                entity = await adapter.MakeReversionCloneAsync(await PostReadEntityAsync(  old.FirstOrDefault()));
+                                entity = await adapter.MakeReversionCloneAsync(await PostReadEntityAsync(  old.FirstOrDefault(),null));
 
 
                             }
@@ -496,7 +498,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         }
 
-        public abstract Task<TEntity> PostReadEntityAsync(TEntity entity);
+        public abstract Task<TEntity> PostReadEntityAsync(TEntity entity, IOverrides overrides);
 
         private object GetEntity(object entity)
         {

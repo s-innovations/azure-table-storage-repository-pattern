@@ -1,8 +1,10 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,12 +17,13 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
 
     }
-
+  
     public interface ITableRepository<TEntity> : ITableRepository,
         ICollection<TEntity>, 
         IQueryable<TEntity>
     {
 
+        IQueryable<T> Project<T>();
     
         EntityTypeConfiguration<TEntity> Configuration { get; }
         ITableStorageContext Context { get; }

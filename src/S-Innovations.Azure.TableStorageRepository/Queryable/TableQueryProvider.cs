@@ -42,6 +42,27 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         }
     }
 
+    internal class TableQueryProvider<TEntity, TProjected> : TableQueryProvider<TEntity>
+    {
+        public TableQueryProvider(
+            ILoggerFactory logfactory, IQueryable<TEntity> source, EntityTypeConfiguration<TEntity> entityConverter)
+            : base(logfactory, source, entityConverter)
+        {
+        }
+        public override async Task<object> ExecuteTranslationResultAsync(TranslationResult result, TablePocoRepository<TEntity> _repository, CancellationToken cancellationToken)
+        {
+            var enumerable= await _repository
+                .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)
+                .Then(async p => await _repository.GetProcessedResultAsync(p, result, new Overrides { Factory = (props)=> Activator.CreateInstance<TProjected>() }).ConfigureAwait(false), cancellationToken)
+                .ConfigureAwait(false) as IEnumerable<TEntity>;
+
+
+            return enumerable.OfType<TProjected>();
+
+
+        }
+        
+    }
 
     /// <summary>
     ///     LINQ to Windows Azure Storage Table query provider.
@@ -239,7 +260,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         /// <param name="expression"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task<object> ExecuteAsync(
+        public virtual async Task<object> ExecuteAsync(
             Expression expression,
             CancellationToken cancellationToken = default(CancellationToken))
         {
@@ -258,21 +279,25 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
             Logger.LogDebug("Executing Async Expression : {0}, {1}, {2}",
                 result.TableQuery.FilterString, result.TableQuery.TakeCount, string.Join(", ", result.TableQuery.SelectColumns ?? Enumerable.Empty<string>()));
 
-          
+
             var source = _source;
-            while(source is IWrappingQueryable<TEntity> wrapper)
+            while (source is IWrappingQueryable<TEntity> wrapper)
             {
                 source = wrapper.Parent;
             }
 
             var _repository = source as TablePocoRepository<TEntity>;
 
+            return await ExecuteTranslationResultAsync(result, _repository, cancellationToken);
 
+        }
+
+        public virtual async Task<object> ExecuteTranslationResultAsync(TranslationResult result, TablePocoRepository<TEntity> _repository, CancellationToken cancellationToken)
+        {
             return await _repository
                 .ExecuteQueryAsync<EntityAdapter<TEntity>>(result.TableQuery, cancellationToken)
-                .Then(async p => await _repository.GetProcessedResultAsync(p, result).ConfigureAwait(false), cancellationToken)
+                .Then(async p => await _repository.GetProcessedResultAsync(p, result,null).ConfigureAwait(false), cancellationToken)
                 .ConfigureAwait(false);
-
         }
 
 

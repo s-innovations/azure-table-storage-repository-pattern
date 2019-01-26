@@ -58,6 +58,14 @@ namespace SInnovations.Azure.TableStorageRepository
     {
         T InnerObject { get; }
     }
+    public class Overrides : IOverrides
+    {
+        public Func<IDictionary<string, EntityProperty>,object> Factory { get; set; }
+    }
+    public interface IOverrides
+    {
+        Func<IDictionary<string, EntityProperty>, object> Factory { get; }
+    }
     public class EntityAdapter<TEntity> : IEntityAdapter, ITableEntity
     {
         public delegate Task<bool> OnEntityChanged(TEntity current, TEntity old, IDictionary<string, EntityProperty> currentProps, IDictionary<string, EntityProperty> oldProps);
@@ -121,11 +129,13 @@ namespace SInnovations.Azure.TableStorageRepository
         public string ETag { get; set; }
 
         private OperationContext operationContext;
-        public virtual async Task PostReadEntityAsync(EntityTypeConfiguration<TEntity> config)
+
+        public virtual async Task PostReadEntityAsync(EntityTypeConfiguration<TEntity> config, IOverrides overrides)
         {
             this.config = config;
             //Create the Entity Object Type
-            this.InnerObject = config.CreateEntity(Properties);
+            this.InnerObject = overrides?.Factory != null ? (TEntity)overrides.Factory(Properties) :  config.CreateEntity(Properties); 
+
             //Read all default supported types from table entity
             TableEntity.ReadUserObject(this.InnerObject, Properties, operationContext);
 
