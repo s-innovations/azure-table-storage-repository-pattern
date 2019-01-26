@@ -23,7 +23,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         {
             this.Parent = parent;
             this.Prefix = prefix;
-            this.Provider = (parent as TableQueryProvider<TEntity>).Clone(this);
+            this.Provider = (parent.Provider as TableQueryProvider<TEntity>).Clone(this);
         }
         public Type ElementType => this.Parent.ElementType;
 
@@ -45,7 +45,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         {
             this.Parent = parent;
             this.Filter = filter;
-            this.Provider = (parent as TableQueryProvider<TEntity>).Clone(this);
+            this.Provider = (parent.Provider as TableQueryProvider<TEntity>).Clone(this);
         }
         public Type ElementType => this.Parent.ElementType;
 
