@@ -16,6 +16,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         Task SaveChangesAsync();
 
 
+
     }
   
     public interface ITableRepository<TEntity> : ITableRepository,
