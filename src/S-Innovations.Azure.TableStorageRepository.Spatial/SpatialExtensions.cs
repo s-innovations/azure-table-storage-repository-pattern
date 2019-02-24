@@ -568,7 +568,7 @@ namespace SInnovations.Azure.TableStorageRepository
             string key = "";
 
 
-            var entityToKeyProperty = config.ConvertToStringKey(IndexKeyExpression, out key);
+            var entityToKeyProperty = config.ConvertToStringKey(IndexKeyExpression,config.IgnoreRowKeyPropertyRemovables, out key);
 
 
             //var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key);

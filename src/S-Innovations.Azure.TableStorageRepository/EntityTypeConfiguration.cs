@@ -202,14 +202,20 @@ namespace SInnovations.Azure.TableStorageRepository
             EntityStates = new ConcurrentDictionary<long, Tuple<DateTimeOffset, string>>();
             PropertiesToEncode = new Dictionary<string, EncoderPair>(); // new List<string>();
             Properties = new List<PropertyConfiguration>();
-            IgnoreKeyPropertyRemovables = new Dictionary<string, object>();
+
+             IgnorePartitionKeyPropertyRemovables = new Dictionary<string, object>();
+            IgnoreRowKeyPropertyRemovables = new Dictionary<string, object>();
         }
         public object KeyMapper { get; set; }
 
         public Dictionary<string, string> KeyMappings { get; set; }
         public Dictionary<string, IndexConfiguration> Indexes { get; set; }
         public Dictionary<string, EncoderPair> PropertiesToEncode { get; set; }
-        public Dictionary<string,object> IgnoreKeyPropertyRemovables { get; set; }
+        public Dictionary<string,object> IgnorePartitionKeyPropertyRemovables { get; set; }
+        public Dictionary<string, object> IgnoreRowKeyPropertyRemovables { get; set; }
+
+        public bool IgnoredKey(string key) => this.IgnoreRowKeyPropertyRemovables.ContainsKey(key) || this.IgnorePartitionKeyPropertyRemovables.ContainsKey(key);
+
         public List<CollectionConfiguration> Collections { get; set; }
         public List<PropertyConfiguration> Properties { get; set; }
 
@@ -302,12 +308,24 @@ namespace SInnovations.Azure.TableStorageRepository
         }
 
         public EntityTypeConfiguration<TEntityType> WithKeyPropertyTransformation<PropertyType>(
-            Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder)
+            Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder, string KeyType = "PartitionKey")
         {
             if (propertyExpression.Body is MemberExpression)
             {
                 var memberEx = propertyExpression.Body as MemberExpression;
-                IgnoreKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+                if (KeyType == "PartitionKey")
+                {
+                    IgnorePartitionKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+                }else
+                if(KeyType == "RowKey")
+                {
+                    IgnoreRowKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+                }
+                else
+                {
+                    IgnorePartitionKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+                    IgnoreRowKeyPropertyRemovables.Add(memberEx.Member.Name, encoder);
+                }
             }
 
             return this;
@@ -323,8 +341,8 @@ namespace SInnovations.Azure.TableStorageRepository
 
             var keyMapper = new KeysMapper<TEntityType>
             {
-                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression, out partitionKey, lengthQueue),
-                RowKeyMapper = RowKeyExpression == null ? (e) => "" : ConvertToStringKey(RowKeyExpression, out rowKey, lengthQueue)
+                PartitionKeyMapper = ConvertToStringKey(PartitionKeyExpression,IgnorePartitionKeyPropertyRemovables, out partitionKey, lengthQueue),
+                RowKeyMapper = RowKeyExpression == null ? (e) => "" : ConvertToStringKey(RowKeyExpression, IgnoreRowKeyPropertyRemovables, out rowKey, lengthQueue)
             };
             if (!string.IsNullOrEmpty(partitionKey))
                 this.KeyMappings.Add(partitionKey, "PartitionKey");
@@ -396,7 +414,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     
                     //  PropertyInfo property = newEx.Members[i] as PropertyInfo;
                     PropertyInfo property = type.GetRuntimeProperty(newEx.Members[i].Name);
-                    if (IgnoreKeyPropertyRemovables.ContainsKey(newEx.Members[i].Name))
+                    if (IgnoredKey(newEx.Members[i].Name))
                         property = null;
 
                     if (i + 1 == newEx.Members.Count && i + 1 < parts.Length)
@@ -448,7 +466,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             string key = "";
 
-            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, out key,null,partitionPrefix);
+            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression,IgnorePartitionKeyPropertyRemovables, out key,null,partitionPrefix);
             Indexes.Add(key, new IndexConfiguration<TEntityType>
             {
                 PartitionKeyProvider = entityToKeyProperty,
@@ -457,8 +475,8 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
                     var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
-                        IgnoreKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
-                            TypeConvert(IgnoreKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
+                        IgnorePartitionKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
+                            TypeConvert(IgnorePartitionKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
                     if(string.IsNullOrEmpty(partitionPrefix))
                         return idxKey;
                     return $"{partitionPrefix}{TableStorageContext.KeySeparator}{idxKey}";
@@ -698,7 +716,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
 
-        public Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, out string key, Queue<LengthPadding?> lenghts = null, string prefix = null)
+        public Func<TEntityType, string> ConvertToStringKey<T>(Expression<Func<TEntityType, T>> expression, IDictionary<string,object> ignores, out string key, Queue<LengthPadding?> lenghts = null, string prefix = null)
         {
             var func = expression.Compile();
             if (expression.Body is MemberExpression)
@@ -708,9 +726,10 @@ namespace SInnovations.Azure.TableStorageRepository
                 key = propertyName;
                 var length = (lenghts == null || lenghts.Count == 0) ? (LengthPadding?)null : lenghts.Dequeue();
 
+                //var ignores = keyType == "PartitionKey" ? IgnorePartitionKeyPropertyRemovables : IgnoreRowKeyPropertyRemovables;
 
-                return (o) => ConvertToString(IgnoreKeyPropertyRemovables.ContainsKey(propertyName) ? 
-                    TypeConvert(IgnoreKeyPropertyRemovables[propertyName], func(o)) : func(o) as object,
+                return (o) => ConvertToString(ignores.ContainsKey(propertyName) ? 
+                    TypeConvert(ignores[propertyName], func(o)) : func(o) as object,
                     GetEncoder(propertyName), length);
             }
             else if (expression.Body is NewExpression)
@@ -733,7 +752,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
                    
 
-                    var objs = properties.Select((p, i) => ConvertToString( IgnoreKeyPropertyRemovables.ContainsKey(p.Name) ? TypeConvert(IgnoreKeyPropertyRemovables[p.Name],p.GetValue(obj)) :  p.GetValue(obj),                        
+                    var objs = properties.Select((p, i) => ConvertToString(ignores.ContainsKey(p.Name) ? TypeConvert(ignores[p.Name],p.GetValue(obj)) :  p.GetValue(obj),                        
                         GetEncoder(properties[i].Name), lenghtsList[i])
                     ).ToArray();
 

@@ -289,9 +289,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     encoder = _configuration.PropertiesToEncode[name].Encoder;
 
                 }
-                if (isKey && _configuration.IgnoreKeyPropertyRemovables.ContainsKey(name))
+                if (isKey && _configuration.IgnorePartitionKeyPropertyRemovables.ContainsKey(name))
                 {
-                    valueConverter=((Delegate)_configuration.IgnoreKeyPropertyRemovables[name]);
+                    valueConverter=((Delegate)_configuration.IgnorePartitionKeyPropertyRemovables[name]);
                 }
 
             }
