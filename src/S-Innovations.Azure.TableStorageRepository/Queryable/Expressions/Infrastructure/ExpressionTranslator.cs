@@ -105,7 +105,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     if (i > 0)
                         filter.Append(" and ");
 
-
+                    //PartitionKey eq 'tset__2518512911999999999'( and SwipeTime ge datetime'2019-02-24T16:53:00') and SwipeTime lt datetime'2019-02-24T16:54:00'
                     if (!startswith)
                     {
                         filter.Append(key.Key);
@@ -154,10 +154,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     }
 
                 } while (idx > -1);
+
                 if (odataFilter.Equals(" and "))
                     odataFilter = "";
 
-                odataFilter = filter.ToString() + odataFilter;
+              
+                   
+
+                odataFilter = filter.ToString() + odataFilter.Replace("( and", " and (");
             }
 
             _result.AddFilter(odataFilter);
@@ -346,7 +350,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
            
             var left = binary.Left;
 
-            if (left.NodeType == ExpressionType.MemberAccess)
+            if (left.NodeType == ExpressionType.MemberAccess && binary.Method.Name == "op_Equality")
             {
                 var member = (MemberExpression)binary.Left;
                 string key;
