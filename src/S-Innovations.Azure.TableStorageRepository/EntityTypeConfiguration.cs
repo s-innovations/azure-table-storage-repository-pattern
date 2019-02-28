@@ -307,8 +307,8 @@ namespace SInnovations.Azure.TableStorageRepository
             return HasKeys<TPartitionKey, String>(PartitionKeyExpression, null, keylenghts);
         }
 
-        public EntityTypeConfiguration<TEntityType> WithKeyPropertyTransformation<PropertyType>(
-            Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder, string KeyType = "PartitionKey")
+        public EntityTypeConfiguration<TEntityType> WithKeyTransformation<PropertyType>(
+            Expression<Func<TEntityType, PropertyType>> propertyExpression, Func<PropertyType,string> encoder, string KeyType=null)
         {
             if (propertyExpression.Body is MemberExpression)
             {
