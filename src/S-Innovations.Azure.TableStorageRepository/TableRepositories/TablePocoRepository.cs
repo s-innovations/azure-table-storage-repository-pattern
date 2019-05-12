@@ -147,14 +147,21 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         internal Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity,new()
         {
-            var query = new TableQuery<T>
+          
+                var query = new TableQuery<T>
+                {
+                    FilterString = tableQuery.FilterString,
+                    SelectColumns = tableQuery.SelectColumns,
+                    TakeCount = tableQuery.TakeCount
+                };
+            try
             {
-                FilterString = tableQuery.FilterString,
-                SelectColumns = tableQuery.SelectColumns,
-                TakeCount = tableQuery.TakeCount
-            };
-
-            return Table.ExecuteQueryAsync(query, cancellationToken);
+                return Table.ExecuteQueryAsync(query, cancellationToken);
+            }catch(Exception ex)
+            {
+                Logger.LogWarning(ex,"Exception on {@Query}", query);
+                throw;
+            }
         }
 
         /// <summary>
