@@ -19,7 +19,7 @@ namespace SInnovations.Azure.TableStorageRepository
         internal static MethodInfo EntityConfigTypeMethod = typeof(EntityTypeConfigurationsContainer).GetRuntimeMethods().Single(x => x.IsGenericMethod && x.Name == "Entity");
         internal static Type TablePocoRepositoryType = typeof(TablePocoRepository<>);
         internal static Type EntityConfigurationType = typeof(EntityTypeConfiguration<>);
-        internal static Type LazyType = typeof(Lazy<>);
+      //  internal static Type LazyType = typeof(Lazy<>);
         internal static Type FuncType = typeof(Func<>);
 
         public static ITableRepository RepositoryFactory(ILoggerFactory loggerFactory, IEntityTypeConfigurationsContainer container, ITableStorageContext ctx, Type EntityType)
@@ -27,16 +27,17 @@ namespace SInnovations.Azure.TableStorageRepository
             // var TableRepositoryType = IsEntityType ? TableEntityRepositoryType : TablePocoRepositoryType;
 
             var EntityConfigType = EntityConfigurationType.MakeGenericType(EntityType);
-            var lazyType = LazyType.MakeGenericType(EntityConfigType);
+           // var lazyType = LazyType.MakeGenericType(EntityConfigType);
             var argumetns = new Object[] 
                     {
                         loggerFactory,
-                        ctx,                         
-                        Activator.CreateInstance( //Lazy<EntityTypeConfiguration<EntityType>>
-                            lazyType, 
-                            new Object[]{
-                                EntityConfigTypeMethod.MakeGenericMethod(EntityType).CreateDelegate(FuncType.MakeGenericType(EntityConfigType),container)
-                            }) 
+                        ctx,
+                         EntityConfigTypeMethod.MakeGenericMethod(EntityType).Invoke(container,new object[]{ })//   .CreateDelegate(FuncType.MakeGenericType(EntityConfigType),container).DynamicInvoke()
+                        //Activator.CreateInstance( //Lazy<EntityTypeConfiguration<EntityType>>
+                        //    lazyType, 
+                        //    new Object[]{
+                        //        EntityConfigTypeMethod.MakeGenericMethod(EntityType).CreateDelegate(FuncType.MakeGenericType(EntityConfigType),container)
+                        //    }) 
                     };
 
 
@@ -137,7 +138,7 @@ namespace SInnovations.Azure.TableStorageRepository
                 {
                     var EntityType = repository.PropertyType.GenericTypeArguments[0];
                     var rep = Factory.RepositoryFactory(logFactory, container,this, EntityType);
-                  
+            
                     repositories.Add(rep);
                     repository.SetValue(this, rep);
                     
