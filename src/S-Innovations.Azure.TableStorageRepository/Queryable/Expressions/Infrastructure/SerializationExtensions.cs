@@ -36,7 +36,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                 {
                     typeof (DateTimeOffset), o => string.Format(
                         "datetime'{0}'",
-                        XmlConvert.ToString(((DateTimeOffset) o).DateTime, XmlDateTimeSerializationMode.RoundtripKind))
+                        XmlConvert.ToString(((DateTimeOffset) o).UtcDateTime, XmlDateTimeSerializationMode.RoundtripKind))
                 },
                 {
                     typeof (Byte[]), o =>

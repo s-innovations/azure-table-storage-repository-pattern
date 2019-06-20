@@ -53,11 +53,19 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         internal TableRepository(ILoggerFactory logFactory, ITableStorageContext context, EntityTypeConfiguration configuration)
         {
+            this.loggerFactory = logFactory ?? throw new ArgumentNullException(nameof(logFactory));          
+            this.Context = context ?? throw new ArgumentNullException(nameof(context));
+            this.Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration)); 
+            this.table = new Lazy<CloudTable>(CloudTableFactory);
             this.Logger = logFactory.CreateLogger<TableRepository<TEntity>>();
-            this.Context = context;
-            this.Configuration = configuration;
-            this.table = new Lazy<CloudTable>(() => context.GetTable(configuration.TableName(context)));
-            this.loggerFactory = logFactory;
+
+        }
+
+        private CloudTable CloudTableFactory()
+        {
+            
+            var tableName = Configuration.TableName(Context) ?? throw new ArgumentNullException("tableName");
+            return Context.GetTable(tableName) ?? throw new ArgumentNullException("table");
             
         }
 

@@ -83,10 +83,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
             if (this.Configuration == null)
                 throw new Exception("Configuration was not created");
+
             var mapper = Configuration.GetKeyMappers<TEntity>();
             if(mapper == null)
             {
-                throw new Exception("Key Mapper was not created");
+                Logger.LogWarning("Key mapper was not created for {Type}",typeof(TEntity));
+                throw new Exception($"Key mapper was not created for {typeof(TEntity)}");
             }
 
             if (mapper.PartitionKeyMapper == null)
@@ -149,14 +151,22 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         /// </returns>
         internal Task<IEnumerable<T>> ExecuteQueryAsync<T>(ITableQuery tableQuery, CancellationToken cancellationToken) where T : ITableEntity,new()
         {
-            var query = new TableQuery<T>
+          
+                var query = new TableQuery<T>
+                {
+                    FilterString = tableQuery.FilterString,
+                    SelectColumns = tableQuery.SelectColumns,
+                    TakeCount = tableQuery.TakeCount
+                };
+            try
             {
-                FilterString = tableQuery.FilterString,
-                SelectColumns = tableQuery.SelectColumns,
-                TakeCount = tableQuery.TakeCount
-            };
-
-            return Table.ExecuteQueryAsync(query, cancellationToken);
+                var _table = table.Value;
+                return _table.ExecuteQueryAsync(query, cancellationToken);
+            }catch(Exception ex)
+            {
+                Logger.LogWarning(ex,"Exception on {@Query}", query);
+                throw;
+            }
         }
 
         /// <summary>

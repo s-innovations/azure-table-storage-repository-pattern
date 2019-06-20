@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
+using System.IO;
 
 namespace SInnovations.Azure.TableStorageRepository
 {
@@ -522,7 +523,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             //      var type = typeof(PropertyConfiguration<>);
             //var fact = this.GetType().GetMethod("PropertyConfigurationFactory", BindingFlags.Static | BindingFlags.NonPublic);
-            var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactory");
+            var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactoryV2");
 
 
             foreach (var prop in typeof(TEntityType).GetRuntimeProperties().Where(p => p.PropertyType.GetTypeInfo().IsEnum))
@@ -568,9 +569,36 @@ namespace SInnovations.Azure.TableStorageRepository
                     Serializer = (Func<T, Task<EntityProperty>>)(p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p))))
                 };
         }
+        private static PropertyConfiguration PropertyConfigurationFactoryV2<T>()
+        {
+            return new PropertyConfiguration<TEntityType, T>()
+            {
+                Deserializer = (Func<EntityProperty, Task<T>>)(Deserializer<T>),
+                Serializer = (Func<T, Task<EntityProperty>>)(Serializer<T>)
+            };
+        }
 
+        private static Task<T> Deserializer<T>(EntityProperty property)
+        {
+            var obj = property.PropertyAsObject;
+            if(obj is int intValue)
+                return Task.FromResult((T)obj);
 
-      
+           if(obj is byte[] bytes)
+                return Task.FromResult(JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(bytes)));
+
+            return   Task.FromResult(JsonConvert.DeserializeObject<T>(property.StringValue));
+        }
+
+        private static Task<EntityProperty> Serializer<T>(T obj)
+        {
+            if (typeof(T).IsEnum)
+                return Task.FromResult(new EntityProperty((int)(object)obj));
+             
+
+            return Task.FromResult(new EntityProperty(Encoding.UTF8.GetBytes( JsonConvert.SerializeObject(obj))));
+        }
+
         public EntityTypeConfiguration<TEntityType> WithReversionTracking(Func<ITableRepository<TEntityType>,TEntityType,ITableQuery> headFilter)
         {
             this.ReversionTracking.Enabled = true;
@@ -597,14 +625,20 @@ namespace SInnovations.Azure.TableStorageRepository
             {
                 var memberEx = expression.Body as MemberExpression;
 
-                this.Properties.Add(new PropertyConfiguration<TEntityType,T>
-                {
-                    PropertyInfo = memberEx.Member as PropertyInfo,
-                    // EntityType = typeof(T),
-                    // ParentEntityType = typeof(TEntityType),
-                    Deserializer = deserializer ?? (p => Task.FromResult(JsonConvert.DeserializeObject<T>(p.StringValue))),
-                    Serializer = serializer ?? (p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p)))),
-                });
+                var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactoryV2");
+                var prop = memberEx.Member as PropertyInfo;
+                PropertyConfiguration config = (PropertyConfiguration)fact.MakeGenericMethod(prop.PropertyType).Invoke(null, null);
+                config.PropertyInfo = prop;
+                this.Properties.Add(config);
+
+                //this.Properties.Add(new PropertyConfiguration<TEntityType,T>
+                //{
+                //    PropertyInfo = memberEx.Member as PropertyInfo,
+                //    // EntityType = typeof(T),
+                //    // ParentEntityType = typeof(TEntityType),
+                //    Deserializer = deserializer ?? (p => Task.FromResult(JsonConvert.DeserializeObject<T>(p.StringValue))),
+                //    Serializer = serializer ?? (p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p)))),
+                //});
             }
 
             return this;
@@ -728,9 +762,23 @@ namespace SInnovations.Azure.TableStorageRepository
 
                 //var ignores = keyType == "PartitionKey" ? IgnorePartitionKeyPropertyRemovables : IgnoreRowKeyPropertyRemovables;
 
-                return (o) => ConvertToString(ignores.ContainsKey(propertyName) ? 
-                    TypeConvert(ignores[propertyName], func(o)) : func(o) as object,
-                    GetEncoder(propertyName), length);
+                string GetKey(TEntityType o)
+                {
+
+                    var str= ConvertToString(ignores.ContainsKey(propertyName) ?
+                        TypeConvert(ignores[propertyName], func(o)) : func(o) as object,
+                        GetEncoder(propertyName), length);
+
+                    if (!string.IsNullOrEmpty(prefix))
+                    {
+                        return $"{prefix}{TableStorageContext.KeySeparator}{str}";
+                    }
+
+                    return str;
+                }
+
+
+                return GetKey;
             }
             else if (expression.Body is NewExpression)
             {
@@ -743,8 +791,11 @@ namespace SInnovations.Azure.TableStorageRepository
                 while (mi-- > 0)
                     lenghtsList.Add(lenghts == null || lenghts.Count == 0 ? (LengthPadding?)null : lenghts.Dequeue());
 
-                return (o) =>
+
+
+                string GetKey(TEntityType o)
                 {
+                    
                     if (o == null)
                         throw new ArgumentNullException("Object cannot be null");
 
@@ -767,6 +818,7 @@ namespace SInnovations.Azure.TableStorageRepository
                     return string.Join(TableStorageContext.KeySeparator, objs.Select(t => t == null ? "" : t));
 
                 };
+                return GetKey;
             }
             else
             {
