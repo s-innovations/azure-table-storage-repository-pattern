@@ -329,6 +329,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                                                 Entity =
                                                     new IndexEntity
                                                     {
+                                                        ETag ="*",
                                                         Config = index,
                                                         PartitionKey = indexkey,
                                                         RowKey = index.GetIndexSecondKey(item.Entity),
