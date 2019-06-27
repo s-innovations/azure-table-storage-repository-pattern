@@ -136,10 +136,10 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 //TODO Optimize by executing all indexes at the same time and return the first found result.
                 foreach (var idxConfig in index)
                 {
-
+                    var tkeys = idxConfig.GetIndexKeyFunc(keys);
                     if (idxConfig.CopyAllProperties)
                     {
-                        var opr = TableOperation.Retrieve<TEntity>(idxConfig.GetIndexKeyFunc(keys), "");
+                        var opr = TableOperation.Retrieve<TEntity>(tkeys.Item1, tkeys.Item2);
                         var entity = await table.ExecuteAsync(opr);
                         if (entity.Result != null)
                         {
@@ -149,7 +149,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                     else
                     {
 
-                        var opr = TableOperation.Retrieve<IndexEntity>(idxConfig.GetIndexKeyFunc(keys), "");
+                        var opr = TableOperation.Retrieve<IndexEntity>(tkeys.Item1, tkeys.Item2);
                         var result = await table.ExecuteAsync(opr);
                         if (result.Result != null)
                         {

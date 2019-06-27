@@ -32,7 +32,7 @@ namespace SInnovations.Azure.TableStorageRepository
         public abstract string GetIndexSecondKey(object entity);
         public bool CopyAllProperties { get; set; }
 
-        public Func<object[], string> GetIndexKeyFunc { get; set; }
+        public Func<object[], (string,string)> GetIndexKeyFunc { get; set; }
     }
 
     public class IndexConfiguration<TEntity> : IndexConfiguration
@@ -478,9 +478,45 @@ namespace SInnovations.Azure.TableStorageRepository
                     var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
                         IgnorePartitionKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
                             TypeConvert(IgnorePartitionKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
+
                     if(string.IsNullOrEmpty(partitionPrefix))
-                        return idxKey;
-                    return $"{partitionPrefix}{TableStorageContext.KeySeparator}{idxKey}";
+                        return (idxKey,"");
+                    return ($"{partitionPrefix}{TableStorageContext.KeySeparator}{idxKey}","");
+                },
+                CopyAllProperties = CopyAllProperties,
+            });
+
+            //Action<TEntityType, string> partitionAction = GetReverseActionFrom<IndexKeyType>(IndexKeyExpression);
+
+            return this;
+        }
+        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, Expression<Func<TEntityType, IndexKeyType>> SecondaryIndexKeyExpression,bool CopyAllProperties = false, string TableName = null, string partitionPrefix = null)
+        {
+            string key = "";
+            string row = "";
+
+            var entityToKeyProperty = ConvertToStringKey(IndexKeyExpression, IgnorePartitionKeyPropertyRemovables, out key, null, partitionPrefix);
+            var secondaryProp = ConvertToStringKey(SecondaryIndexKeyExpression, IgnorePartitionKeyPropertyRemovables, out row, null);
+            Indexes.Add(key, new IndexConfiguration<TEntityType>
+            {
+                PartitionKeyProvider = entityToKeyProperty,
+                RowKeyProvider = secondaryProp,
+                TableName = (ctx) => TableName ?? (string.IsNullOrWhiteSpace(this.TableName?.Invoke(ctx)) ? null : this.TableName(ctx) + "Index"),
+                GetIndexKeyFunc = (objs) =>
+                {
+                    var propNames = key.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    var idxKey = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
+                        IgnorePartitionKeyPropertyRemovables.ContainsKey(propNames[idx]) ?
+                            TypeConvert(IgnorePartitionKeyPropertyRemovables[propNames[idx]], obj) : obj, GetEncoder(propNames[idx]))));
+
+                    var propNames1 = row.Split(new[] { TableStorageContext.KeySeparator }, StringSplitOptions.RemoveEmptyEntries);
+                    var idxKey1 = string.Join(TableStorageContext.KeySeparator, objs.Select((obj, idx) => ConvertToString(
+                        IgnorePartitionKeyPropertyRemovables.ContainsKey(propNames1[idx]) ?
+                            TypeConvert(IgnorePartitionKeyPropertyRemovables[propNames1[idx]], obj) : obj, GetEncoder(propNames1[idx]))));
+
+                    if (string.IsNullOrEmpty(partitionPrefix))
+                        return (idxKey, idxKey1);
+                    return ($"{partitionPrefix}{TableStorageContext.KeySeparator}{idxKey}", idxKey1);
                 },
                 CopyAllProperties = CopyAllProperties,
             });
