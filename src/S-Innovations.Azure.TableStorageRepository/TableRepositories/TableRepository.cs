@@ -312,6 +312,39 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                                 batchOpr.Add(TableOperation.Merge(item.Entity));
                                 break;
                             case EntityState.Deleted:
+                                foreach (var index in Configuration.Indexes.Values)
+                                {
+                                    try
+                                    {
+                                        var indexkeys = index.GetIndexKey(item.Entity);
+                                        if (indexkeys == null)
+                                            continue;
+
+                                        foreach (var indexkey in indexkeys)
+                                        {
+
+                                            indexes.Add(new EntityStateWrapper<IndexEntity>
+                                            {
+                                                State = EntityState.Deleted,
+                                                Entity =
+                                                    new IndexEntity
+                                                    {
+                                                        Config = index,
+                                                        PartitionKey = indexkey,
+                                                        RowKey = index.GetIndexSecondKey(item.Entity),
+                                                        RefRowKey = item.Entity.RowKey,
+                                                        RefPartitionKey = item.Entity.PartitionKey,
+                                                        Ref = item.Entity
+                                                    }
+                                            });
+
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+
+                                    }
+                                }
                                 batchOpr.Add(TableOperation.Delete(item.Entity));
                                 break;
                             default:
