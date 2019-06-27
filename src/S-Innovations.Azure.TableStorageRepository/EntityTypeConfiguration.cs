@@ -490,7 +490,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
             return this;
         }
-        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, Expression<Func<TEntityType, IndexKeyType>> SecondaryIndexKeyExpression,bool CopyAllProperties = false, string TableName = null, string partitionPrefix = null)
+        public EntityTypeConfiguration<TEntityType> WithIndex<IndexKeyType, SecondaryIndexKeyType>(Expression<Func<TEntityType, IndexKeyType>> IndexKeyExpression, Expression<Func<TEntityType, SecondaryIndexKeyType>> SecondaryIndexKeyExpression,bool CopyAllProperties = false, string TableName = null, string partitionPrefix = null)
         {
             string key = "";
             string row = "";
