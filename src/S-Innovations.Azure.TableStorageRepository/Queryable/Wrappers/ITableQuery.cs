@@ -35,5 +35,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
         ///     A list of strings containing the property names of the table entity properties to return when the query is executed.
         /// </value>
         IList<string> SelectColumns { get; set; }
+
+        string TableName { get; set; }
     }
 }

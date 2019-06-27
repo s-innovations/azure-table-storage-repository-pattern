@@ -161,6 +161,12 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             try
             {
                 var _table = table.Value;
+
+                if (!string.IsNullOrEmpty(tableQuery.TableName))
+                {
+                    _table = Context.GetTable(tableQuery.TableName);
+                }
+
                 return _table.ExecuteQueryAsync(query, cancellationToken);
             }catch(Exception ex)
             {

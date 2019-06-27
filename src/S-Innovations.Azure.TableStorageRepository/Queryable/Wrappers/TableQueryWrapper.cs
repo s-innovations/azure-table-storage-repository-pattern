@@ -63,5 +63,8 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Wrappers
             get { return _tableQuery.SelectColumns; }
             set { _tableQuery.SelectColumns = value; }
         }
+
+
+        public string TableName { get; set; }
     }
 }

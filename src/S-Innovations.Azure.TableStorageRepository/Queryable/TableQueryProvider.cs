@@ -167,6 +167,10 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                     _filters.Add(filter.Filter);
                 }
 
+                if (wrapper is FromTableQueryableWrapper<TEntity> fromTable)
+                {
+                    result.TableQuery.TableName = fromTable.TableName;
+                }
 
                 source = wrapper.Parent;
 

@@ -36,6 +36,28 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
         IEnumerator IEnumerable.GetEnumerator() => this.Parent.GetEnumerator();
 
     }
+    public class FromTableQueryableWrapper<TEntity> : IQueryable<TEntity>, IWrappingQueryable<TEntity>
+    {
+        public IQueryable<TEntity> Parent { get; }
+        public string TableName { get; }
+
+        public FromTableQueryableWrapper(IQueryable<TEntity> parent, string tableName)
+        {
+            this.Parent = parent;
+            this.TableName = tableName;
+            this.Provider = (parent.Provider as TableQueryProvider<TEntity>).Clone(this);
+        }
+        public Type ElementType => this.Parent.ElementType;
+
+        public Expression Expression => this.Parent.Expression;
+
+        public IQueryProvider Provider { get; }
+
+        public IEnumerator<TEntity> GetEnumerator() => this.Parent.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => this.Parent.GetEnumerator();
+
+    }
     public class FilterWrappingQueryableWrapper<TEntity> : IQueryable<TEntity>, IWrappingQueryable<TEntity>
     {
         public IQueryable<TEntity> Parent { get; }
@@ -79,6 +101,14 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
 
           //  return source;
         }
+        public static IQueryable<T> FromTable<T>(this IQueryable<T> source, string tableName)
+        {
+            return new FromTableQueryableWrapper<T>(source, tableName);
+
+            //  (source.Provider as TableQueryProvider<T>).AddPrefix(prefix);
+
+            //  return source;
+        }
         public static IQueryable<T> WithODataFilter<T>(this IQueryable<T> source, string filter)
         {
             if (string.IsNullOrEmpty(filter))
@@ -113,7 +143,9 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable
                                      .Then(result => ((IEnumerable<T>)result).ToList(), cancellationToken);
         }
 
-       
+
+      
+
 
         /// <summary>
         ///     Executes a query ToList method asynchronously.
