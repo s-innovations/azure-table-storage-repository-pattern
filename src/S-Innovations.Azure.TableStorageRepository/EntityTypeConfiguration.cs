@@ -660,21 +660,27 @@ namespace SInnovations.Azure.TableStorageRepository
             if (expression.Body is MemberExpression)
             {
                 var memberEx = expression.Body as MemberExpression;
-
-                var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactoryV2");
-                var prop = memberEx.Member as PropertyInfo;
-                PropertyConfiguration config = (PropertyConfiguration)fact.MakeGenericMethod(prop.PropertyType).Invoke(null, null);
-                config.PropertyInfo = prop;
-                this.Properties.Add(config);
-
-                //this.Properties.Add(new PropertyConfiguration<TEntityType,T>
-                //{
-                //    PropertyInfo = memberEx.Member as PropertyInfo,
-                //    // EntityType = typeof(T),
-                //    // ParentEntityType = typeof(TEntityType),
-                //    Deserializer = deserializer ?? (p => Task.FromResult(JsonConvert.DeserializeObject<T>(p.StringValue))),
-                //    Serializer = serializer ?? (p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p)))),
-                //});
+                if (deserializer == null && serializer == null)
+                {
+                    var fact = this.GetType().GetTypeInfo().GetDeclaredMethod("PropertyConfigurationFactoryV2");
+                    var prop = memberEx.Member as PropertyInfo;
+                    PropertyConfiguration config = (PropertyConfiguration)fact.MakeGenericMethod(prop.PropertyType).Invoke(null, null);
+                    config.PropertyInfo = prop;
+                    config.Deserializer = deserializer ?? config.Deserializer;
+                    config.Serializer = serializer ?? config.Serializer;
+                    this.Properties.Add(config);
+                }
+                else
+                {
+                    this.Properties.Add(new PropertyConfiguration<TEntityType, T>
+                    {
+                        PropertyInfo = memberEx.Member as PropertyInfo,
+                        // EntityType = typeof(T),
+                        // ParentEntityType = typeof(TEntityType),
+                        Deserializer = deserializer ?? (p => Task.FromResult(JsonConvert.DeserializeObject<T>(p.StringValue))),
+                        Serializer = serializer ?? (p => Task.FromResult(new EntityProperty(JsonConvert.SerializeObject(p)))),
+                    });
+                }
             }
 
             return this;
