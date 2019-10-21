@@ -52,21 +52,20 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 
         public IQueryable<T> Project<T>()
         {
-            return new ProjectedQuery<T, TEntity>(this,this.loggerFactory,this.Context,this.Configuration as EntityTypeConfiguration<TEntity>);
+            return new ProjectedQuery<T, TEntity>(this,this.loggerFactory,this.Context,this.configuration.Value as EntityTypeConfiguration<TEntity>);
         }
 
     private readonly ILogger Logger;
         private readonly Expression _expression;
-
-        public new EntityTypeConfiguration<TEntity> Configuration { get { return base.Configuration as EntityTypeConfiguration<TEntity>; } }
+        public new EntityTypeConfiguration<TEntity> Configuration { get { return this.configuration.Value as EntityTypeConfiguration<TEntity>; } }
        
-        public TablePocoRepository(ILoggerFactory logFactory, ITableStorageContext context, EntityTypeConfiguration<TEntity> configuration)
-            : base(logFactory,context,  configuration)
+        public TablePocoRepository(ILoggerFactory logFactory, ITableStorageContext context, Lazy<EntityTypeConfiguration<TEntity>> configuration)
+            : base(logFactory,context, new Lazy<EntityTypeConfiguration>(() => configuration.Value))
         {
             this.Logger = logFactory.CreateLogger<TablePocoRepository<TEntity>>();
             _expression = Expression.Constant(this);
-            _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(logFactory,this, configuration));
-
+            _provider = new Lazy<IQueryProvider>(() => new TableQueryProvider<TEntity>(logFactory,this, configuration.Value));
+          
         }
         //public TableQuery<T> DynamicQuery<T>() where T : ITableEntity, new()
         //{
@@ -81,7 +80,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
             if (keysLocked)
                 return entity;
 
-            if (this.Configuration == null)
+            if (this.configuration == null)
                 throw new Exception("Configuration was not created");
 
             var mapper = Configuration.GetKeyMappers<TEntity>();
@@ -502,6 +501,11 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
                 await entity.PostReadEntityAsync(Configuration,overrides);
             }
             return entity;
+        }
+
+        public void ForceModelCreation()
+        {
+            this.Configuration.ToString();
         }
     }
 }

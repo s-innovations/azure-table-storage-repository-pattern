@@ -46,16 +46,16 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         public CloudTable Table { get { return table.Value; } }
         protected Lazy<CloudTable> table;
 
-        protected EntityTypeConfiguration Configuration { get; private set; }
+        protected EntityTypeConfiguration Configuration { get { return configuration.Value; } }
 
-      //  protected readonly Lazy<EntityTypeConfiguration> configuration;
+        protected readonly Lazy<EntityTypeConfiguration> configuration;
         public ITableStorageContext Context { get; private set; }
 
-        internal TableRepository(ILoggerFactory logFactory, ITableStorageContext context, EntityTypeConfiguration configuration)
+        internal TableRepository(ILoggerFactory logFactory, ITableStorageContext context, Lazy<EntityTypeConfiguration> configuration)
         {
             this.loggerFactory = logFactory ?? throw new ArgumentNullException(nameof(logFactory));          
             this.Context = context ?? throw new ArgumentNullException(nameof(context));
-            this.Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration)); 
+            this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration)); 
             this.table = new Lazy<CloudTable>(CloudTableFactory);
             this.Logger = logFactory.CreateLogger<TableRepository<TEntity>>();
 

@@ -15,6 +15,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
     {
         Task SaveChangesAsync();
 
+        void ForceModelCreation();
 
 
     }
