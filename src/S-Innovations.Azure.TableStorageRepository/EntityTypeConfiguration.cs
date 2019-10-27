@@ -265,7 +265,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
         private static Action<TEntityType, IDictionary<string, EntityProperty>, string> EmptyReverseAction = (_, __, ___) => { };
         Func<IDictionary<string, EntityProperty>, Object[]> ArgumentsExpression;
-        Func<IDictionary<string, EntityProperty>, TEntityType> CtorExpression;
+        Func<IDictionary<string, EntityProperty>,string,DateTimeOffset, TEntityType> CtorExpression;
         public EntityTypeConfiguration(ILoggerFactory factory, IEntityTypeConfigurationsContainer container)
         {
             _loggerFactory = factory;
@@ -278,10 +278,10 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
 
-        public TEntityType CreateEntity(IDictionary<string, EntityProperty> properties)
+        public TEntityType CreateEntity(IDictionary<string, EntityProperty> properties,string etag, DateTimeOffset timestamp)
         {
             if (CtorExpression != null)
-                return CtorExpression(properties);
+                return CtorExpression(properties,etag, timestamp);
 
             if (ArgumentsExpression == null)
                 return Activator.CreateInstance<TEntityType>();
@@ -294,7 +294,7 @@ namespace SInnovations.Azure.TableStorageRepository
             return this;
         }
         public EntityTypeConfiguration<TEntityType> WithNoneDefaultConstructor(
-            Func<IDictionary<string, EntityProperty>, TEntityType> CtorExpression)
+            Func<IDictionary<string, EntityProperty>, string, DateTimeOffset, TEntityType> CtorExpression)
         {
             this.CtorExpression = CtorExpression;
             return this;

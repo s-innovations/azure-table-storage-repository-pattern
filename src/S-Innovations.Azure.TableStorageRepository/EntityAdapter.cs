@@ -134,7 +134,7 @@ namespace SInnovations.Azure.TableStorageRepository
         {
             this.config = config;
             //Create the Entity Object Type
-            this.InnerObject = overrides?.Factory != null ? (TEntity)overrides.Factory(Properties) :  config.CreateEntity(Properties); 
+            this.InnerObject = overrides?.Factory != null ? (TEntity)overrides.Factory(Properties) :  config.CreateEntity(Properties,ETag,Timestamp); 
 
             //Read all default supported types from table entity
             TableEntity.ReadUserObject(this.InnerObject, Properties, operationContext);
@@ -153,10 +153,14 @@ namespace SInnovations.Azure.TableStorageRepository
                     tasks.Add(propInfo.SetCompositePropertyAsync(this.InnerObject, Properties.Where(k => k.Key.StartsWith(propInfo.PropertyInfo.Name)).ToDictionary(k => k.Key.Substring(propInfo.PropertyInfo.Name.Length + 2), v => v.Value)));
                 }
             }
+            
+            
 
             await Task.WhenAll(tasks.ToArray());
             //Reverse Part and RowKeys  to its InnerObject properties and add them to the property dict also.
             config.ReverseKeyMapping(this);
+
+
         }
         public virtual void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
         {
