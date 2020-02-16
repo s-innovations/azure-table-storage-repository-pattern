@@ -145,9 +145,13 @@ namespace SInnovations.Azure.TableStorageRepository
         public override Task<EntityProperty> GetPropertyAsync(object p)
         {
             var obj = PropertyInfo.GetValue(p);
-            if (obj != null)
-                return ((Func<PropertyType, Task<EntityProperty>>)Serializer)((PropertyType)PropertyInfo.GetValue(p));
-            return Task.FromResult<EntityProperty>(null);
+         
+            if(obj == default || obj == null)
+                return Task.FromResult<EntityProperty>(null);
+         
+              
+            return ((Func<PropertyType, Task<EntityProperty>>)Serializer)((PropertyType)PropertyInfo.GetValue(p));
+          
         }
         public override Task<IDictionary<string, EntityProperty>> GetPropertiesAsync(object p)
         {

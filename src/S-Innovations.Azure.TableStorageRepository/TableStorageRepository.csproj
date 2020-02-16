@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1;netstandard2.0</TargetFrameworks>
     <RootNamespace>SInnovations.Azure.TableStorageRepository</RootNamespace>
     <AssemblyName>S-Innovations.Azure.TableStorageRepository</AssemblyName>
-    <Version>4.0.0-pre</Version>
+    <Version>5.0.0-pre</Version>
     <Company>S-Innovations v/Poul K. Sørensen</Company>
     <Authors>Poul K. Sørensen</Authors>
     <FileVersion>5.0.0.0</FileVersion>
@@ -12,12 +12,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Linq.Queryable" Version="4.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.2.0" />
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.10.0" />
-    <PackageReference Include="WindowsAzure.Storage">
-      <Version>9.3.3</Version>
-    </PackageReference>
+    <PackageReference Include="WindowsAzure.Storage" Version="9.3.3" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'netcoreapp3.1'">
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.11.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.2.0" />   
+  </ItemGroup>
+  
+  <ItemGroup>
+   
   </ItemGroup>
 
 </Project>
