@@ -1,6 +1,4 @@
-﻿using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.Azure.Cosmos.Table;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
 using System.Collections;

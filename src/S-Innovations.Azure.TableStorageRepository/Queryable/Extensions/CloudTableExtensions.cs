@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿
+using Microsoft.Azure.Cosmos.Table;
 using SInnovations.Azure.TableStorageRepository;
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.WindowsAzure.Storage.Table
+namespace Microsoft.Azure.Cosmos.Table
 {
     public static class CloudTableExtensions
     {

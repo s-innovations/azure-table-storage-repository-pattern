@@ -1,4 +1,4 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System.IO;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace SInnovations.Azure.TableStorageRepository
 {

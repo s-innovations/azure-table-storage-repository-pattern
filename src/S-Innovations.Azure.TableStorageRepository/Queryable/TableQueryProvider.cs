@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.Queryable.Base;
 using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;

@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.Queryable;
 using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
@@ -232,7 +232,7 @@ namespace SInnovations.Azure.TableStorageRepository.TableRepositories
         ///     <see cref="T:Microsoft.WindowsAzure.Storage.Table.TableBatchOperation" />
         ///     on the table.
         /// </returns>
-        public Task<IList<TableResult>> ExecuteBatchAsync(TableBatchOperation tableBatchOperation, CancellationToken cancellationToken)
+        public Task<TableBatchResult> ExecuteBatchAsync(TableBatchOperation tableBatchOperation, CancellationToken cancellationToken)
         {
             return Table.ExecuteBatchAsync(tableBatchOperation,null,null, cancellationToken);
         }

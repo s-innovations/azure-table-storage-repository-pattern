@@ -1,4 +1,4 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;

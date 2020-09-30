@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.DataInitializers;
 using SInnovations.Azure.TableStorageRepository.TableRepositories;
 using System;
@@ -183,7 +182,7 @@ namespace SInnovations.Azure.TableStorageRepository
 
 
 
-        public Microsoft.WindowsAzure.Storage.RetryPolicies.IRetryPolicy RetryPolicy
+        public IRetryPolicy RetryPolicy
         {
             get;set;
         }

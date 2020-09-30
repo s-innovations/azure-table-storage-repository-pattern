@@ -1,4 +1,4 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿
 using SInnovations.Azure.TableStorageRepository.Queryable.Wrappers;
 using System;
 using System.Collections.Concurrent;
@@ -9,12 +9,13 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using Microsoft.WindowsAzure.Storage;
+
 using System.Linq.Expressions;
 using SInnovations.Azure.TableStorageRepository.Queryable;
 using Microsoft.Extensions.Logging;
 using SInnovations.Azure.TableStorageRepository.Queryable.Expressions;
 using System.Threading;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace SInnovations.Azure.TableStorageRepository.TableRepositories
 {
