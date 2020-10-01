@@ -89,6 +89,7 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                         k.Key,
                         PropertyName = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.PropertyName)),
                         StartsWithPattern = string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value)),
+                         
                         HasStartsWith = k.Any(v=>v.StartsWith),// string.Join(TableStorageContext.KeySeparator, k.OrderBy(v => v.Position).Select(v => v.Value)),
                     }).ToArray();
 
@@ -110,21 +111,22 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
                     {
                         filter.Append(key.Key);
                         filter.Append(" eq '");
-                        filter.Append(key.StartsWithPattern);
+                        filter.Append(EvaluateValue(_configuration, key.Key, key.PropertyName, key.StartsWithPattern));
                         filter.Append("'");
 
 
-                    }else { 
+                    }else {
 
-                        var length = key.StartsWithPattern.Length - 1;
-                        var lastChar = key.StartsWithPattern[length];
+                        var startwithpattern = EvaluateValue(_configuration, key.Key, key.PropertyName, key.StartsWithPattern);
+                        var length = startwithpattern.Length - 1;
+                        var lastChar = startwithpattern[length];
                         var nextLastChar = (char)(lastChar + 1);
-                        var startsWithEndPattern = key.StartsWithPattern.Substring(0, length) + nextLastChar;
+                        var startsWithEndPattern = startwithpattern.Substring(0, length) + nextLastChar;
 
 
                         filter.Append(key.Key);
                         filter.Append(" ge '");
-                        filter.Append(key.StartsWithPattern);
+                        filter.Append(startwithpattern);
                         filter.Append("' and ");
                         filter.Append(key.Key);
                         filter.Append(" lt '");
@@ -165,6 +167,16 @@ namespace SInnovations.Azure.TableStorageRepository.Queryable.Expressions.Infras
             }
 
             _result.AddFilter(odataFilter);
+        }
+
+        private string EvaluateValue(EntityTypeConfiguration configuration, string key,string propertyName, string startsWithPattern)
+        {
+            if (key == "PartitionKey" && configuration.IgnorePartitionKeyPropertyRemovables.ContainsKey(propertyName))
+              return (configuration.IgnorePartitionKeyPropertyRemovables[propertyName] as Delegate).DynamicInvoke(startsWithPattern)?.ToString();
+            else if (key == "RowKey" && configuration.IgnoreRowKeyPropertyRemovables.ContainsKey(propertyName))
+                return (configuration.IgnoreRowKeyPropertyRemovables[propertyName] as Delegate).DynamicInvoke(startsWithPattern)?.ToString();
+            else
+                return (startsWithPattern);
         }
 
         public void AddPostProcessing(MethodCallExpression method)
